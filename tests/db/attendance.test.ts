@@ -241,7 +241,7 @@ test('CN006 conflicto tardío revierte correcciones previas del lote y conserva 
 test('CN006 recuentos sin equiparar justificadas, día local y selección fuera del ciclo', async (t) => {
   const { db, r } = setup();
   t.after(() => db.delete());
-  const f = await createFixture(r);
+  await createFixture(r);
   assert.deepEqual(
     attendanceCounts([
       { status: 'present' },
@@ -253,6 +253,6 @@ test('CN006 recuentos sin equiparar justificadas, día local y selección fuera 
     { present: 1, absent: 1, late: 1, excused: 1, unregistered: 1, total: 5 },
   );
   assert.equal(attendanceCounts([]).total, 0);
-  assert.equal(defaultDate(f.year, new Date(2026, 9, 19, 23, 59)), date);
-  assert.equal(defaultDate(f.year, new Date(2025, 9, 19)), '');
+  assert.equal(defaultDate(new Date(2026, 9, 19, 23, 59)), date);
+  assert.equal(defaultDate(new Date(2025, 9, 19)), '2025-10-19');
 });

@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { ClassNoteDatabase } from '../../src/db/database.ts';
 import { Repositories } from '../../src/db/repositories.ts';
 import { BackupService } from '../../src/services/backup/backupService.ts';
-import { fillRelated } from './fixtures.ts';
+import { createFixture, fillRelated } from './fixtures.ts';
 
 // Browser FileReader contract needed by the addon; no product fallback or test hook.
 Object.assign(globalThis, {
@@ -200,4 +200,46 @@ test('CN012 selección inválida se sanea solo después de restaurar; historial 
   assert.equal(await db.submissions.count(), 1);
   assert.equal((await db.students.get(fixture.student.id))?.active, false);
   assert.equal((await db.enrollments.get(fixture.enrollment.id))?.status, 'inactive');
+});
+
+test('total del grupo conserva cuatro restaurados más un alta manual con fechas diferentes', async (t) => {
+  const origin = setup();
+  const destination = setup();
+  t.after(async () => {
+    await origin.db.delete();
+    await destination.db.delete();
+  });
+  const f = await createFixture(origin.r);
+  await origin.r.updateEnrollment(f.enrollmentContext, {
+    joinedAt: '2026-10-26',
+    status: 'active',
+  });
+  for (let i = 0; i < 3; i++)
+    await origin.r.createStudentWithEnrollment(f.context, {
+      firstName: `Restaurado ${i}`,
+      lastName: 'Prueba',
+      joinedAt: '2026-10-26',
+    });
+  const source = await origin.service.export();
+  assert.equal(await destination.service.restore(source, true, async () => true), true);
+  await destination.r.createStudentWithEnrollment(f.context, {
+    firstName: 'Manual',
+    lastName: 'Prueba',
+    joinedAt: '2026-08-01',
+  });
+  const before = await snapshot(destination.db);
+  const summary = await destination.r.loadDashboard(f.context, '2026-10-21');
+  const group = await destination.r.listGroupStudents(f.context);
+  assert.equal(summary.groupStudents, 5);
+  assert.equal(
+    summary.groupStudents,
+    group.filter((row) => row.enrollment.status === 'active').length,
+  );
+  assert.equal(summary.students, 1);
+  assert.equal(summary.attendance?.total, 1);
+  assert.equal((await destination.r.loadDashboard(f.context, '2026-10-26')).students, 5);
+  const outside = await destination.r.loadDashboard(f.context, '2027-08-01');
+  assert.equal(outside.groupStudents, 5);
+  assert.equal(outside.attendance, null);
+  assert.deepEqual(await snapshot(destination.db), before);
 });

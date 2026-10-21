@@ -10,13 +10,13 @@ import { Sidebar } from '../components/layout/Sidebar';
 import { Dashboard } from '../features/dashboard/Dashboard';
 import { ModulePlaceholder } from '../features/ModulePlaceholder';
 import { useNavigation } from './useNavigation';
-import { StorageNotice } from './StorageNotice';
-import { WorkContextSelector } from './WorkContextSelector';
 import { SchoolManagement } from '../features/school-years/SchoolManagement';
+import { useStorage } from './useStorage';
 import { BackupRestore } from '../features/settings/BackupRestore';
 
 export function App() {
   const current = useNavigation();
+  const { state, retry } = useStorage();
   const [settingsRevision, setSettingsRevision] = useState(0);
   const mainRef = useRef<HTMLElement>(null);
   const previousSection = useRef(current?.id);
@@ -45,9 +45,13 @@ export function App() {
       <Sidebar current={current} />
       <main id="main-content" ref={mainRef} tabIndex={-1} className="main-content">
         <Header current={current} />
-        <StorageNotice />
-        <WorkContextSelector />
-        {current?.id === 'home' ? (
+        {state.status === 'error' ? (
+          <section className="panel school-management" role="alert">
+            <h2>No se pudieron abrir tus datos</h2>
+            <p>Intenta de nuevo para continuar.</p>
+            <button onClick={() => void retry()}>Reintentar</button>
+          </section>
+        ) : current?.id === 'home' ? (
           <Dashboard />
         ) : current?.id === 'students' ? (
           <Students />
@@ -61,18 +65,17 @@ export function App() {
           <Observations />
         ) : current?.id === 'settings' ? (
           <>
-            <BackupRestore onRestored={() => setSettingsRevision((value) => value + 1)} />
             <SchoolManagement key={settingsRevision} />
+            <details className="settings-disclosure">
+              <summary>Respaldos y recuperación</summary>
+              <BackupRestore onRestored={() => setSettingsRevision((value) => value + 1)} />
+            </details>
           </>
         ) : current?.id === 'reports' ? (
           <Reports />
         ) : (
           <ModulePlaceholder section={current} />
         )}
-        <footer className="page-footer">
-          Hecho para el día a día de tu aula.
-          <span>ClassNote · Sin cuentas ni servicios externos</span>
-        </footer>
       </main>
     </div>
   );

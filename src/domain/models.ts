@@ -13,7 +13,7 @@ export interface AuditedEntity {
 export interface SchoolYear extends AuditedEntity {
   label: string;
   startDate: SchoolDate;
-  endDate: SchoolDate;
+  endDate?: SchoolDate;
   archived: boolean;
 }
 export interface Group extends AuditedEntity {

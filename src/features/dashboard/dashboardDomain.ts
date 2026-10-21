@@ -32,7 +32,7 @@ export function dashboardSummary(
   logs: readonly ReadingLog[],
 ) {
   const period = dashboardPeriod(today);
-  const inYear = today >= year.startDate && today <= year.endDate;
+  const inYear = today >= year.startDate && (!year.endDate || today <= year.endDate);
   const population = inYear ? enrollments.filter((row) => includesDate(row, today)) : [];
   const attendanceByMember = new Map(
     attendance.filter((row) => row.date === today).map((row) => [row.enrollmentId, row]),
@@ -74,6 +74,7 @@ export function dashboardSummary(
     today,
     inYear,
     ...period,
+    groupStudents: enrollments.filter((row) => row.status === 'active').length,
     students: population.length,
     attendance: inYear
       ? attendanceCounts(

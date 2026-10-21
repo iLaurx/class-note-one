@@ -16,10 +16,8 @@ export function Observations() {
   const groupId = data?.selection.groupId;
   return (
     <section className="attendance assignments" aria-label="Observaciones del grupo">
-      <h2>Observaciones del grupo</h2>
-      <a href="#/inicio">Volver a Inicio</a>
       {!year || !groupId ? (
-        <p>Selecciona un ciclo y un grupo para registrar observaciones.</p>
+        <p>Configura tu grupo en Configuración para registrar observaciones.</p>
       ) : (
         <NotesWorkspace key={`${year.id}:${groupId}`} year={year} groupId={groupId} />
       )}
@@ -56,7 +54,7 @@ function NotesWorkspace({ year, groupId }: { year: SchoolYear; groupId: string }
     } catch {
       if (sequence.current === token) {
         setData(null);
-        setError('No se pudieron consultar las observaciones. Reintenta solo la lectura.');
+        setError('No se pudieron consultar las observaciones. Inténtalo de nuevo.');
       }
     } finally {
       if (sequence.current === token) setBusy(false);
@@ -106,7 +104,7 @@ function NotesWorkspace({ year, groupId }: { year: SchoolYear; groupId: string }
       {!form && data && !busy && (
         <>
           {!data.members.length ? (
-            <p>Este grupo aún no tiene matrículas. Agrega alumnos para registrar observaciones.</p>
+            <p>Agrega alumnos para registrar observaciones.</p>
           ) : (
             <button
               onClick={() => {
@@ -120,54 +118,61 @@ function NotesWorkspace({ year, groupId }: { year: SchoolYear; groupId: string }
           )}
           <section aria-label="Historial de observaciones">
             <h3>Historial de observaciones</h3>
-            <div className="assignment-filters">
-              <label>
-                Buscar por nombre o texto
-                <input
-                  type="search"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                />
-              </label>
-              <label>
-                Filtrar por categoría
-                <select
-                  aria-label="Filtrar por categoría"
-                  value={category}
-                  onChange={(event) => setCategory(event.target.value)}
-                >
-                  <option value="">Todas las categorías</option>
-                  {Object.entries(noteCategories).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Filtrar por matrícula
-                <select
-                  aria-label="Filtrar por matrícula"
-                  value={enrollmentId}
-                  onChange={(event) => setEnrollmentId(event.target.value)}
-                >
-                  <option value="">Todas las matrículas</option>
-                  {data.members.map((item) => (
-                    <option key={item.enrollment.id} value={item.enrollment.id}>
-                      {fullName(item.student)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Observaciones desde
-                <input type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
-              </label>
-              <label>
-                Observaciones hasta
-                <input type="date" value={to} onChange={(event) => setTo(event.target.value)} />
-              </label>
-            </div>
+            <details className="filter-disclosure">
+              <summary>Buscar y filtrar</summary>
+              <div className="assignment-filters">
+                <label>
+                  Buscar por nombre o texto
+                  <input
+                    type="search"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Filtrar por categoría
+                  <select
+                    aria-label="Filtrar por categoría"
+                    value={category}
+                    onChange={(event) => setCategory(event.target.value)}
+                  >
+                    <option value="">Todas las categorías</option>
+                    {Object.entries(noteCategories).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Filtrar por alumno
+                  <select
+                    aria-label="Filtrar por alumno"
+                    value={enrollmentId}
+                    onChange={(event) => setEnrollmentId(event.target.value)}
+                  >
+                    <option value="">Todos los alumnos</option>
+                    {data.members.map((item) => (
+                      <option key={item.enrollment.id} value={item.enrollment.id}>
+                        {fullName(item.student)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Observaciones desde
+                  <input
+                    type="date"
+                    value={from}
+                    onChange={(event) => setFrom(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Observaciones hasta
+                  <input type="date" value={to} onChange={(event) => setTo(event.target.value)} />
+                </label>
+              </div>
+            </details>
             {filterError && <p role="alert">{filterError}</p>}
             {!filterError && !history.length && (
               <p>
@@ -188,7 +193,9 @@ function NotesWorkspace({ year, groupId }: { year: SchoolYear; groupId: string }
                     <span>
                       {note.date} · {noteCategories[note.category]}
                     </span>
-                    <span>{noteMemberCondition(member)}</span>
+                    {(member.enrollment.status !== 'active' || !member.student.active) && (
+                      <span>{noteMemberCondition(member)}</span>
+                    )}
                     <p className="assignment-description">{note.body}</p>
                     <button
                       onClick={() => {

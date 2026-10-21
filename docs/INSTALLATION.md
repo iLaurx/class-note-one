@@ -28,13 +28,14 @@ separado del uso offline de ClassNote.
    la ubicación predeterminada es `%LOCALAPPDATA%\ClassNote`.
 3. Abre ClassNote desde el acceso creado por el instalador. El primer inicio
    debe mostrar una base vacía; no hay alumnos de ejemplo ni cuenta que activar.
-4. En **Configuración**, crea un ciclo escolar con fechas y un grupo. Selecciona
-   ese ciclo y grupo como contexto de trabajo.
+4. En **Configuración**, crea un ciclo escolar con fecha de inicio, fecha de fin opcional y el grupo de la maestra.
+   Pulsa **Crear grupo** en ese ciclo e indica grado y nombre. Solo puede haber un
+   grupo activo por ciclo; su información aparece en la barra lateral.
 5. En **Alumnos**, registra una ficha y su matrícula. En **Asistencia**, elige una
    fecha dentro de la matrícula, captura estados y guarda. Espera la confirmación.
 6. Puedes crear tareas y capturar entregas, registrar lecturas y observaciones.
-   **Inicio** resume los registros del contexto seleccionado. Cambiar de grupo
-   no traslada los datos del anterior. Guarda o descarta borradores cuando se avise.
+   **Inicio** resume los registros del grupo activo. Puedes editar su grado y nombre
+   desde Configuración. Guarda o descarta borradores cuando se avise.
 7. Cierra completamente la aplicación y ábrela otra vez con el mismo usuario de
    Windows. Comprueba selección e historial. Haz un respaldo antes de usar datos
    reales; consulta el [aviso de privacidad](PRIVACY.md).
@@ -45,8 +46,8 @@ Con WebView2 instalado, los módulos y recursos de ClassNote son locales. No hay
 login, sincronización, servidor ni actualizador automático. La comprobación de
 offline en pruebas no acredita ausencia de tráfico de Windows o del runtime.
 
-En **Reportes**, selecciona ciclo, grupo y rango Desde/Hasta, pulsa **Exportar
-Excel** y elige un archivo `.xlsx`. Espera el mensaje de guardado. Cancelar el
+En **Reportes**, selecciona el rango Desde/Hasta, pulsa **Exportar Excel** y elige
+un archivo `.xlsx`. Espera el mensaje de guardado. Cancelar el
 diálogo no genera un reporte. El libro contiene Alumnos, Asistencia, Tareas y
 Lecturas; no incluye observaciones privadas ni otros grupos. Alumnos incluye las
 matrículas del grupo sin filtro temporal. **Excel no sirve para restaurar datos.**

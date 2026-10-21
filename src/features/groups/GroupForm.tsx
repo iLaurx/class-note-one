@@ -13,10 +13,9 @@ export function GroupForm({
   const { busy, run } = useWorkContext();
   const [grade, setGrade] = useState(group?.grade ?? 1);
   const [name, setName] = useState(group?.name ?? '');
-  const [shift, setShift] = useState(group?.shift ?? '');
   async function save(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
-    const input = { schoolYearId: year.id, grade, name, shift: shift.trim() || undefined };
+    const input = { schoolYearId: year.id, grade, name, shift: group?.shift };
     if (
       await run((r) =>
         group
@@ -35,7 +34,6 @@ export function GroupForm({
       <h3>
         {group ? 'Editar grupo' : 'Crear grupo'} · {year.label}
       </h3>
-      <p>Para cambiar de ciclo, crea otro grupo. Así se conserva el historial.</p>
       <label>
         Grado
         <select autoFocus value={grade} onChange={(e) => setGrade(Number(e.target.value))}>
@@ -47,12 +45,8 @@ export function GroupForm({
         </select>
       </label>
       <label>
-        Nombre del grupo
+        Nombre
         <input required value={name} onChange={(e) => setName(e.target.value)} />
-      </label>
-      <label>
-        Turno (opcional)
-        <input value={shift} onChange={(e) => setShift(e.target.value)} />
       </label>
       <div>
         <button disabled={busy} type="submit">

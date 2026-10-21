@@ -1,16 +1,13 @@
 import { useEffect, useState } from 'react';
-import { BookOpen } from 'lucide-react';
-import { navigation } from '../../app/navigation';
+import { ArrowRight, BookOpen, CalendarCheck, ClipboardList, UsersRound } from 'lucide-react';
 import { useStorage } from '../../app/useStorage';
 import { useWorkContext } from '../../app/useWorkContext';
-import { SectionLink } from '../../components/ui/SectionLink';
 import type { GroupContext, Repositories } from '../../db/repositories';
-import { attendanceLabels } from '../attendance/attendanceDomain';
 import { localDay } from './dashboardDomain';
 
 export function Dashboard() {
-  const { data, busy, error } = useWorkContext();
-  const { state } = useStorage();
+  const { data, busy, error, run } = useWorkContext();
+  const { state, retry } = useStorage();
   const year = data?.years.find((row) => row.id === data.selection.schoolYearId);
   const group = data?.groups.find((row) => row.id === data.selection.groupId);
   const [today, setToday] = useState(localDay);
@@ -25,27 +22,34 @@ export function Dashboard() {
   }, []);
   return (
     <div className="dashboard">
-      <section className="welcome-banner" aria-labelledby="welcome-title">
-        <div>
-          <p className="eyebrow">TU DÍA ESCOLAR</p>
-          <h2 id="welcome-title">¡Qué gusto tenerte aquí!</h2>
-          <p>
-            Resumen del grupo seleccionado · <time dateTime={today}>{today}</time>
-          </p>
-          {!busy && !error && year && group && (
-            <p>
-              {group.grade}.º {group.name} · Ciclo {year.label}
-            </p>
-          )}
-        </div>
-        <BookOpen className="welcome-book" size={100} strokeWidth={1} aria-hidden="true" />
-      </section>
-      {state.status === 'loading' || busy ? (
-        <p role="status">Cargando resumen…</p>
+      {state.status === 'loading' || (state.status !== 'error' && busy) ? (
+        <p role="status">Cargando tu grupo…</p>
       ) : state.status === 'error' || error ? (
-        <p>El resumen no está disponible. Reintenta desde el aviso de almacenamiento o contexto.</p>
+        <div className="empty-state" role="alert">
+          <h2>No pudimos cargar tu grupo</h2>
+          <button
+            onClick={() => {
+              if (state.status === 'error') void retry();
+              else void run();
+            }}
+          >
+            Reintentar
+          </button>
+        </div>
       ) : !year || !group ? (
-        <p>Selecciona un ciclo y un grupo para consultar el resumen.</p>
+        <section className="welcome-banner setup-banner">
+          <span className="icon-tile">
+            <BookOpen size={28} aria-hidden="true" />
+          </span>
+          <div>
+            <span className="eyebrow">BIENVENIDA A TU CUADERNO</span>
+            <h2>Un pequeño grupo. Todo a la mano.</h2>
+            <p>Configura tu grupo y agrega a tus alumnos para empezar.</p>
+            <a className="button-primary" href="#/configuracion">
+              Configurar mi grupo <ArrowRight size={17} aria-hidden="true" />
+            </a>
+          </div>
+        </section>
       ) : (
         <DashboardSummary
           key={`${year.id}:${group.id}:${today}`}
@@ -53,21 +57,6 @@ export function Dashboard() {
           today={today}
         />
       )}
-      <section aria-labelledby="quick-title">
-        <div className="section-heading">
-          <h2 id="quick-title">¿Por dónde empezamos?</h2>
-          <span>Tus accesos rápidos</span>
-        </div>
-        <div className="quick-grid">
-          {navigation
-            .filter((item) =>
-              ['attendance', 'assignments', 'reading', 'students'].includes(item.id),
-            )
-            .map((item) => (
-              <SectionLink key={item.id} item={item} />
-            ))}
-        </div>
-      </section>
     </div>
   );
 }
@@ -108,107 +97,106 @@ function DashboardSummary({ context, today }: { context: GroupContext; today: st
       </div>
     );
   if (!data) return <p role="status">Cargando resumen…</p>;
+  const registered = data.attendance ? data.students - data.attendance.unregistered : 0;
   return (
-    <section aria-label="Resumen del grupo">
-      <div className="section-heading">
-        <h2>Un vistazo a tu grupo</h2>
-      </div>
-      <div className="stats-grid">
-        <article className="stat-card panel" aria-label="Matrículas de hoy">
-          <h3>Alumnos al {today}</h3>
-          {data.inYear ? (
-            <>
-              <strong className="stat-number">{data.students}</strong>
-              <p>
-                {data.students
-                  ? 'Matrículas aplicables hoy (intervalos inclusivos).'
-                  : 'Sin matrículas aplicables hoy.'}
-              </p>
-            </>
-          ) : (
-            <p>Hoy está fuera del ciclo escolar. No hay población aplicable hoy.</p>
-          )}
-          <a href="#/alumnos">Ver alumnos</a>
-        </article>
-        <article className="stat-card panel" aria-label="Asistencia de hoy">
-          <h3>Asistencia del {today}</h3>
-          {!data.attendance ? (
-            <p>Hoy está fuera del ciclo escolar.</p>
-          ) : !data.students ? (
-            <p>Sin matrículas aplicables hoy.</p>
-          ) : (
-            <>
-              {data.attendance.unregistered === data.students && (
-                <p>Aún no hay asistencia registrada hoy.</p>
-              )}
-              <ul>
-                {(['present', 'absent', 'late', 'excused'] as const).map((status) => (
-                  <li key={status}>
-                    {attendanceLabels[status]}: {data.attendance![status]}
-                  </li>
-                ))}
-                <li>Sin registrar: {data.attendance.unregistered}</li>
-              </ul>
-            </>
-          )}
-          <a href="#/asistencia">Ver asistencia</a>
-        </article>
-        <article className="stat-card panel" aria-label="Lecturas de la semana">
-          <h3>Lecturas de esta semana</h3>
+    <>
+      <section className="welcome-banner" aria-labelledby="welcome-title">
+        <div>
+          <span className="eyebrow">TU GRUPO, PASO A PASO</span>
+          <h2 id="welcome-title">Vamos con el día de hoy</h2>
           <p>
-            Del {data.reading.from} al {data.reading.to} · lunes a domingo
+            {!data.inYear
+              ? 'Hoy está fuera del ciclo escolar.'
+              : !data.groupStudents
+                ? 'Agrega a tus alumnos para comenzar.'
+                : !data.students
+                  ? 'No hay alumnos para pasar lista en esta fecha.'
+                  : registered === data.students
+                    ? 'La asistencia de hoy está lista.'
+                    : 'Empieza pasando lista a tu grupo.'}
           </p>
-          {data.reading.count ? (
-            <p>
-              {data.reading.minutes} minutos · {data.reading.count} registros
-            </p>
-          ) : (
-            <p>Sin lecturas registradas esta semana.</p>
-          )}
-          <a href="#/lectura">Ver lecturas</a>
-        </article>
-      </div>
-      <section className="panel assignments-panel mt-6" aria-labelledby="agenda-title">
-        <h3 id="agenda-title">En la agenda</h3>
-        <p>
-          Asignadas del {data.recentFrom} al {today}, o con entrega del {today} al {data.upcomingTo}
-          .
-        </p>
-        {!data.assignments.length ? (
-          <p>Sin tareas asignadas recientemente ni con entrega próxima.</p>
-        ) : (
-          <>
-            <p>{data.assignments.length} tareas en este periodo · se muestran hasta 5.</p>
-            <ul className="assignment-list">
-              {data.assignments.slice(0, 5).map((row) => (
-                <li key={row.id}>
-                  <div className="min-w-0 break-words">
-                    <h4>{row.title}</h4>
-                    <p>
-                      Asignada: {row.assignedDate} ·{' '}
-                      {row.dueDate ? `Entrega: ${row.dueDate}` : 'Sin fecha de entrega'}
-                    </p>
-                    <p>
-                      {row.population
-                        ? `${row.pending} pendientes de ${row.population} matrículas aplicables al ${row.assignedDate}`
-                        : 'Sin matrículas aplicables a la fecha de asignación.'}
-                    </p>
-                    {!!row.incidents && (
-                      <p>
-                        {row.incidents} entregas fuera de la población actual; consulta las
-                        incidencias en Tareas.
-                      </p>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-        <a className="text-link mb-4" href="#/tareas">
-          Ver todas las tareas
+        </div>
+        <a className="button-primary" href={data.groupStudents ? '#/asistencia' : '#/alumnos'}>
+          {data.groupStudents ? 'Pasar lista' : 'Agregar alumnos'}
+          <ArrowRight size={17} aria-hidden="true" />
         </a>
       </section>
-    </section>
+      <div className="stats-grid">
+        <a href="#/alumnos" className="stat-card panel" aria-label="Alumnos del grupo">
+          <UsersRound size={20} aria-hidden="true" />
+          <strong className="stat-number">{data.groupStudents}</strong>
+          <span>Alumnos</span>
+        </a>
+        <a href="#/asistencia" className="stat-card panel" aria-label="Asistencia de hoy">
+          <CalendarCheck size={20} aria-hidden="true" />
+          <strong className="stat-number">
+            {data.attendance ? data.attendance.present : '—'}
+            <span className="stat-denominator"> / {data.students}</span>
+          </strong>
+          <span>Presentes hoy</span>
+          {data.inYear && data.students !== data.groupStudents && (
+            <small>
+              {data.students} {data.students === 1 ? 'alumno para' : 'alumnos para'} esta fecha
+            </small>
+          )}
+          <small>
+            {data.attendance && data.attendance.unregistered
+              ? `${data.attendance.unregistered} sin registrar`
+              : data.attendance
+                ? 'Sin registros pendientes'
+                : 'Fuera del ciclo'}
+          </small>
+        </a>
+        <a href="#/lectura" className="stat-card panel" aria-label="Lecturas de la semana">
+          <BookOpen size={20} aria-hidden="true" />
+          <strong className="stat-number">
+            {data.reading.minutes}
+            <span className="stat-denominator"> min</span>
+          </strong>
+          <span>Lectura esta semana</span>
+          <small>{data.reading.count} registros</small>
+        </a>
+      </div>
+      <section className="panel agenda-panel" aria-labelledby="agenda-title">
+        <div className="section-heading">
+          <h2 id="agenda-title">Tareas recientes y próximas</h2>
+          <a className="text-link" href="#/tareas">
+            Ver tareas <ArrowRight size={15} aria-hidden="true" />
+          </a>
+        </div>
+        {!data.assignments.length ? (
+          <div className="empty-state">
+            <ClipboardList size={28} aria-hidden="true" />
+            <h3>Todo despejado por aquí</h3>
+            <p>Las tareas de tu grupo aparecerán aquí.</p>
+            <a className="text-link" href="#/tareas">
+              Crear una tarea <ArrowRight size={15} aria-hidden="true" />
+            </a>
+          </div>
+        ) : (
+          <ul className="assignment-list">
+            {data.assignments.slice(0, 5).map((row) => (
+              <li key={row.id}>
+                <span className="icon-tile">
+                  <ClipboardList size={18} aria-hidden="true" />
+                </span>
+                <div>
+                  <h3>{row.title}</h3>
+                  <p>
+                    {row.dueDate
+                      ? `Entrega: ${new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short' }).format(new Date(`${row.dueDate}T12:00:00`))}`
+                      : 'Sin fecha de entrega'}
+                  </p>
+                  {!!row.incidents && (
+                    <p role="status">Revisa {row.incidents} entregas en Tareas.</p>
+                  )}
+                </div>
+                <span className="due-label">{row.pending} pendientes</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </>
   );
 }

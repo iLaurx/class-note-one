@@ -1,19 +1,17 @@
-import { WifiOff } from 'lucide-react';
 import type { NavigationItem } from '../../app/navigation';
 
 export function Header({ current }: { current: NavigationItem | undefined }) {
+  const date = new Intl.DateTimeFormat('es-MX', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(new Date());
   return (
     <header className="page-header">
-      <div>
-        <p className="eyebrow mb-1">MI AGENDA</p>
-        <h1 id="page-title" tabIndex={-1}>
-          {current?.label ?? 'Sección no encontrada'}
-        </h1>
-      </div>
-      <span className="offline-badge">
-        <WifiOff size={14} aria-hidden="true" />
-        Sin conexión requerida
-      </span>
+      <h1 id="page-title" tabIndex={-1}>
+        {current?.id === 'home' ? 'Mi día' : (current?.label ?? 'Sección no encontrada')}
+      </h1>
+      <span className="header-date">{date}</span>
     </header>
   );
 }

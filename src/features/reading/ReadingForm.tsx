@@ -30,7 +30,7 @@ export function ReadingForm({
   const { repositories } = useStorage();
   const [initial] = useState(() => ({
     enrollmentId: reading?.enrollmentId ?? selectedId,
-    date: reading?.date ?? defaultDate(year),
+    date: reading?.date ?? defaultDate(),
     title: reading?.title ?? '',
     minutes: String(reading?.minutes ?? 0),
     comment: reading?.comment ?? '',
@@ -57,7 +57,7 @@ export function ReadingForm({
           reading &&
           dirty &&
           !window.confirm(
-            `Se corregirá una lectura de ${member ? fullName(member.student) : 'esta matrícula'} del ${reading.date}. ¿Guardar la corrección del historial?`,
+            `Se corregirá una lectura de ${member ? fullName(member.student) : 'este alumno'} del ${reading.date}. ¿Guardar la corrección del historial?`,
           )
         ) {
           locked.current = false;
@@ -92,16 +92,16 @@ export function ReadingForm({
       {error && <p role="alert">{error}</p>}
       {dirty && <p role="status">Cambios de lectura sin guardar</p>}
       <label>
-        Alumno / matrícula
+        Alumno
         <select
-          aria-label="Alumno / matrícula"
+          aria-label="Alumno"
           autoFocus={!reading}
           required
           disabled={busy || !!reading}
           value={fields.enrollmentId}
           onChange={(event) => setFields({ ...fields, enrollmentId: event.target.value })}
         >
-          <option value="">Selecciona una matrícula</option>
+          <option value="">Selecciona un alumno</option>
           {members.map((item) => (
             <option key={item.enrollment.id} value={item.enrollment.id}>
               {fullName(item.student)}
@@ -109,8 +109,9 @@ export function ReadingForm({
           ))}
         </select>
       </label>
-      {member && <p>{memberCondition(member)}</p>}
-      {reading && <p>La matrícula propietaria se conserva al editar.</p>}
+      {member && (member.enrollment.status !== 'active' || !member.student.active) && (
+        <p>{memberCondition(member)}</p>
+      )}
       <label>
         Fecha de lectura
         <input
@@ -146,7 +147,6 @@ export function ReadingForm({
           onChange={(event) => setFields({ ...fields, minutes: event.target.value })}
         />
       </label>
-      <p>De 0 a 1440 minutos por entrada. Puedes registrar varias lecturas el mismo día.</p>
       <label>
         Comentario (opcional)
         <textarea

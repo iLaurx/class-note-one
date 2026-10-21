@@ -4,7 +4,7 @@ Alcance: alta y edición de lecturas por matrícula, historial individual y resu
 
 ## Reglas y consulta
 
-- Fecha local real `YYYY-MM-DD` dentro del ciclo y del intervalo de matrícula, con ambos extremos inclusivos. Sin salida registrada, el límite superior es el fin del ciclo. Las matrículas inactivas y fichas archivadas admiten registros históricos válidos; la UI identifica su condición e intervalo sin inferir fechas de auditoría.
+- Fecha local real `YYYY-MM-DD` dentro del ciclo y del intervalo de matrícula, con ambos extremos inclusivos. La fecha de fin del ciclo es opcional; si no se define, el ciclo queda abierto. Sin salida registrada, el límite superior es el fin del ciclo cuando está definido. Las matrículas inactivas y fichas archivadas admiten registros históricos válidos; la UI identifica su condición e intervalo sin inferir fechas de auditoría.
 - Título o texto leído obligatorio, recortado y no vacío. Comentario opcional recortado. Minutos enteros de **0 a 1440 por entrada**, validados también en el repositorio. No existe máximo diario acumulado adicional.
 - Varias lecturas por matrícula y fecha, incluso con título y contenido idénticos, crean entradas independientes. No hay unicidad por matrícula/fecha ni deduplicación de contenido. El bloqueo inmediato del formulario impide el doble envío de una misma operación.
 - Historial de una matrícula del grupo explícito, con rango inclusivo opcional. Fecha descendente y UUID ascendente como desempate estable. Rangos inválidos muestran error. Se distinguen falta de contexto, grupo sin matrículas, historial sin coincidencias, carga y fallo de consulta con reintento.

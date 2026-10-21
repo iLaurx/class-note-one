@@ -11,7 +11,7 @@ export const attendanceLabels = {
 export function dateInYear(value: unknown, year: SchoolYear) {
   const date = schoolDate(value);
   requireRule(
-    date >= year.startDate && date <= year.endDate,
+    date >= year.startDate && (!year.endDate || date <= year.endDate),
     'Elige una fecha dentro del ciclo escolar.',
   );
   return date;
@@ -21,9 +21,9 @@ export function includesDate(enrollment: Enrollment, date: string) {
     enrollment.joinedAt <= date && (enrollment.leftAt === undefined || date <= enrollment.leftAt)
   );
 }
-export function defaultDate(year: SchoolYear, now = new Date()) {
+export function defaultDate(now = new Date()) {
   const today = `${now.getFullYear().toString().padStart(4, '0')}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
-  return today >= year.startDate && today <= year.endDate ? today : '';
+  return today;
 }
 export interface AttendanceDraft {
   enrollmentId: string;

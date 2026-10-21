@@ -1,5 +1,24 @@
 # CN-004 — Ciclos escolares y grupos
 
+## Funcionamiento actual
+
+Cada ciclo admite un solo grupo activo. Configuración presenta el ciclo y su grupo
+juntos: Crear grupo abre directamente un formulario con grado y nombre. Mientras
+exista un grupo activo no se permite crear ni reactivar otro, incluso si las
+operaciones llegan simultáneamente. Archivar conserva su historial.
+
+La tarjeta de la barra lateral muestra grado, nombre y ciclo, con acceso a
+Configuración. No hay selector global de grado ni identificación repetida en las
+pantallas de trabajo. Editar grupo permite cambiar su grado y nombre. Usar ciclo,
+en Configuración, activa otro ciclo que tenga su grupo preparado.
+
+Los grupos heredados se conservan. Si un ciclo tiene varios grupos activos de una
+versión anterior, Configuración permite archivarlos hasta dejar uno, sin borrar
+sus registros. El esquema Dexie v1 se conserva.
+
+Los flujos y resultados de validación que siguen describen la etapa original de
+selección explícita de ciclo y grupo.
+
 Alcance exclusivo: gestión no destructiva de ciclos y grupos y contexto global persistente. Configuración sustituye su placeholder; las ocho secciones y el dashboard de demostración continúan. No hay dependencias nuevas, esquema nuevo, cambios de permisos/CSP ni operaciones Git de escritura.
 
 ## Flujos

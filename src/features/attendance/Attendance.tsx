@@ -21,10 +21,8 @@ export function Attendance() {
   const groupId = selection?.groupId;
   return (
     <section className="attendance" aria-label="Registro de asistencia">
-      <h2>Asistencia diaria</h2>
-      <a href="#/inicio">Volver a Inicio</a>
       {!repositories || !year || !groupId ? (
-        <p>Selecciona un ciclo y un grupo para registrar asistencia.</p>
+        <p>Configura tu grupo en Configuración para registrar asistencia.</p>
       ) : (
         <AttendanceCalendar key={`${year.id}:${groupId}`} year={year} groupId={groupId} />
       )}
@@ -33,7 +31,7 @@ export function Attendance() {
 }
 
 function AttendanceCalendar({ year, groupId }: { year: SchoolYear; groupId: string }) {
-  const [date, setDate] = useState(() => defaultDate(year));
+  const [date, setDate] = useState(() => defaultDate());
   const context = useMemo(() => ({ schoolYearId: year.id, groupId }), [year.id, groupId]);
   let valid = false;
   try {
@@ -60,7 +58,8 @@ function AttendanceCalendar({ year, groupId }: { year: SchoolYear; groupId: stri
         <AttendanceDay key={date} context={context} date={date} />
       ) : (
         <p role="status">
-          Elige una fecha válida entre {year.startDate} y {year.endDate}.
+          Elige una fecha válida desde {year.startDate}
+          {year.endDate ? ` hasta ${year.endDate}` : ''}.
         </p>
       )}
     </>
@@ -92,17 +91,19 @@ function AttendanceDay({ context, date }: { context: GroupContext; date: string 
       )}
       {day.members && (
         <>
-          <p role="status">
-            {day.dirty
-              ? 'Cambios sin guardar · Recuentos en vista previa'
-              : !day.rows.length
-                ? 'Sin matrículas para la fecha'
-                : counts.unregistered === counts.total
-                  ? 'Día sin captura'
-                  : counts.unregistered
-                    ? 'Captura parcial'
-                    : 'Día registrado'}
-          </p>
+          {!day.message && (
+            <p role="status">
+              {day.dirty
+                ? 'Cambios sin guardar'
+                : !day.rows.length
+                  ? 'Sin alumnos en esta fecha'
+                  : counts.unregistered === counts.total
+                    ? 'Elige la asistencia de cada alumno'
+                    : counts.unregistered
+                      ? 'Asistencia pendiente'
+                      : 'Asistencia guardada'}
+            </p>
+          )}
           <dl className="attendance-counts" aria-label="Recuentos del día">
             {Object.entries(attendanceLabels).map(([status, label]) => (
               <div key={status}>
@@ -144,51 +145,47 @@ function AttendanceDay({ context, date }: { context: GroupContext; date: string 
                         {!student.active && <p>Ficha archivada</p>}
                         {enrollment.status === 'inactive' && (
                           <p>
-                            Matrícula inactiva{!enrollment.leftAt ? ' · Sin salida registrada' : ''}
+                            Matrícula inactiva
+                            {!enrollment.leftAt ? ' · Sin salida registrada' : ''}
                           </p>
                         )}
-                        {isChanged(row) && <p>Cambios pendientes</p>}
                       </div>
-                      <label>
-                        Estado de {name}
-                        <select
-                          aria-label={`Estado de ${name}`}
-                          disabled={day.busy}
-                          value={row.status}
-                          onChange={(event) =>
-                            day.edit(enrollment.id, {
-                              status: event.target.value as AttendanceStatus | '',
-                            })
-                          }
-                        >
-                          <option value="" disabled={row.expected !== null}>
-                            Sin registrar
-                          </option>
-                          {Object.entries(attendanceLabels).map(([status, label]) => (
-                            <option value={status} key={status}>
-                              {label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label>
-                        Nota de {name} (opcional)
-                        <input
-                          disabled={day.busy}
-                          value={row.note}
-                          onChange={(event) =>
-                            day.edit(enrollment.id, { note: event.target.value })
-                          }
-                        />
-                      </label>
+                      <div className="status-options" role="group" aria-label={`Estado de ${name}`}>
+                        {Object.entries(attendanceLabels).map(([status, label]) => (
+                          <button
+                            type="button"
+                            key={status}
+                            disabled={day.busy}
+                            aria-pressed={row.status === status}
+                            data-status={status}
+                            onClick={() =>
+                              day.edit(enrollment.id, { status: status as AttendanceStatus })
+                            }
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <details className="row-note" open={row.note ? true : undefined}>
+                        <summary>{row.note ? 'Ver nota' : 'Añadir nota'}</summary>
+                        <label>
+                          Nota de {name} (opcional)
+                          <input
+                            disabled={day.busy}
+                            value={row.note}
+                            onChange={(event) =>
+                              day.edit(enrollment.id, { note: event.target.value })
+                            }
+                          />
+                        </label>
+                      </details>
                     </li>
                   );
                 })}
               </ul>
-              <p>
-                Solo se guardan las filas con estado. Las notas sin estado permanecen en el borrador
-                hasta elegirlo.
-              </p>
+              {day.rows.some((row) => row.note && !row.status) && (
+                <p role="status">Elige un estado para guardar las notas pendientes.</p>
+              )}
             </>
           )}
         </>

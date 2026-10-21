@@ -193,8 +193,11 @@ export class Repositories {
     return this.write(async () => {
       const data = record(input);
       const startDate = schoolDate(data.startDate);
-      const endDate = schoolDate(data.endDate);
-      requireRule(startDate <= endDate, 'El inicio del ciclo no puede ser posterior al fin.');
+      const endDate = data.endDate ? schoolDate(data.endDate) : undefined;
+      requireRule(
+        !endDate || startDate <= endDate,
+        'El inicio del ciclo no puede ser posterior al fin.',
+      );
       const value = {
         ...audit(),
         label: text(data.label, 'Nombre del ciclo'),
@@ -204,6 +207,7 @@ export class Repositories {
       };
       await this.uniqueYear(value.label);
       await this.db.schoolYears.add(value);
+      await this.storeContext(value.id, null);
       return value;
     });
   }
@@ -217,6 +221,7 @@ export class Repositories {
       const data = record(input);
       const year = await this.year(data.schoolYearId);
       requireRule(!year.archived, 'Reactiva el ciclo antes de crear grupos.');
+      await this.requireAvailableGroupSlot(year.id);
       const value = {
         ...audit(),
         schoolYearId: year.id,
@@ -227,6 +232,7 @@ export class Repositories {
       };
       await this.uniqueGroup(year.id, value.grade, value.name);
       await this.db.groups.add(value);
+      await this.storeContext(year.id, value.id);
       return value;
     });
   }
@@ -238,21 +244,36 @@ export class Repositories {
     });
   }
 
+  private async requireAvailableGroupSlot(schoolYearId: string, exceptId?: string) {
+    const active = await this.db.groups
+      .where('schoolYearId')
+      .equals(schoolYearId)
+      .filter((group) => !group.archived && group.id !== exceptId)
+      .first();
+    requireRule(
+      !active,
+      'Este ciclo ya tiene un grupo activo. Edítalo o archívalo antes de crear o reactivar otro.',
+    );
+  }
+
   updateSchoolYear(id: string, input: unknown) {
     return this.write(async () => {
       const previous = await this.year(id);
       requireRule(!previous.archived, 'Reactiva el ciclo antes de editarlo.');
       const data = record(input);
       const startDate = schoolDate(data.startDate);
-      const endDate = schoolDate(data.endDate);
-      requireRule(startDate <= endDate, 'El inicio del ciclo no puede ser posterior al fin.');
+      const endDate = data.endDate ? schoolDate(data.endDate) : undefined;
+      requireRule(
+        !endDate || startDate <= endDate,
+        'El inicio del ciclo no puede ser posterior al fin.',
+      );
       const groups = await this.db.groups.where('schoolYearId').equals(id).primaryKeys();
       const enrollments = await this.db.enrollments.where('groupId').anyOf(groups).toArray();
       for (const enrollment of enrollments) {
         requireRule(
           enrollment.joinedAt >= startDate &&
-            enrollment.joinedAt <= endDate &&
-            (enrollment.leftAt === undefined || enrollment.leftAt <= endDate),
+            (!endDate || enrollment.joinedAt <= endDate) &&
+            (enrollment.leftAt === undefined || !endDate || enrollment.leftAt <= endDate),
           'El intervalo dejaría matrículas fuera del ciclo. Conserva sus fechas.',
         );
       }
@@ -261,7 +282,7 @@ export class Repositories {
         .anyOf(enrollments.map((item) => item.id))
         .toArray();
       requireRule(
-        attendance.every((item) => item.date >= startDate && item.date <= endDate),
+        attendance.every((item) => item.date >= startDate && (!endDate || item.date <= endDate)),
         'El intervalo dejaría asistencias fuera del ciclo. Conserva sus fechas.',
       );
       const fields = { label: text(data.label, 'Nombre del ciclo'), startDate, endDate };
@@ -319,23 +340,37 @@ export class Repositories {
   private async validContext() {
     const savedYear = await this.db.appSettings.get('work.schoolYearId');
     const savedGroup = await this.db.appSettings.get('work.groupId');
-    const year =
+    const savedYearRecord =
       typeof savedYear?.value === 'string'
         ? await this.db.schoolYears.get(savedYear.value)
         : undefined;
-    const group =
+    const savedGroupRecord =
       typeof savedGroup?.value === 'string'
         ? await this.db.groups.get(savedGroup.value)
         : undefined;
-    const schoolYearId = year && !year.archived ? year.id : null;
-    const groupId =
-      schoolYearId && group && !group.archived && group.schoolYearId === schoolYearId
-        ? group.id
-        : null;
-    if (
-      (savedYear && savedYear.value !== schoolYearId) ||
-      (savedGroup && savedGroup.value !== groupId)
-    ) {
+    const activeYears = (await this.db.schoolYears.toArray()).filter((row) => !row.archived);
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const currentYears = activeYears
+      .filter((row) => row.startDate <= today && (!row.endDate || row.endDate >= today))
+      .sort((a, b) => b.startDate.localeCompare(a.startDate));
+    const defaultYear =
+      currentYears[0] ?? [...activeYears].sort((a, b) => b.startDate.localeCompare(a.startDate))[0];
+    const year = savedYearRecord && !savedYearRecord.archived ? savedYearRecord : defaultYear;
+    const schoolYearId = year?.id ?? null;
+    const groups = schoolYearId
+      ? (await this.db.groups.where('schoolYearId').equals(schoolYearId).toArray())
+          .filter((row) => !row.archived)
+          .sort((a, b) => a.grade - b.grade || a.name.localeCompare(b.name, 'es'))
+      : [];
+    const group =
+      savedGroupRecord &&
+      !savedGroupRecord.archived &&
+      savedGroupRecord.schoolYearId === schoolYearId
+        ? savedGroupRecord
+        : groups[0];
+    const groupId = group?.id ?? null;
+    if (savedYear?.value !== schoolYearId || savedGroup?.value !== groupId) {
       await this.storeContext(schoolYearId, groupId);
     }
     return { schoolYearId, groupId };
@@ -391,6 +426,7 @@ export class Repositories {
     return this.write(async () => {
       const { year, group } = await this.group(context);
       requireRule(!year.archived, 'Reactiva el ciclo antes de cambiar el estado del grupo.');
+      if (!archived && group.archived) await this.requireAvailableGroupSlot(year.id, group.id);
       if (group.archived !== archived)
         await this.db.groups.put({ ...group, archived, updatedAt: new Date().toISOString() });
       await this.validContext();
@@ -430,8 +466,9 @@ export class Repositories {
       const leftAt = data.leftAt === undefined ? undefined : schoolDate(data.leftAt);
       requireRule(
         joinedAt >= year.startDate &&
-          joinedAt <= year.endDate &&
-          (leftAt === undefined || (leftAt >= joinedAt && leftAt <= year.endDate)),
+          (!year.endDate || joinedAt <= year.endDate) &&
+          (leftAt === undefined ||
+            (leftAt >= joinedAt && (!year.endDate || leftAt <= year.endDate))),
         'Las fechas de matrícula deben estar ordenadas y dentro del ciclo.',
       );
       const value = {
@@ -527,8 +564,9 @@ export class Repositories {
       const leftAt = data.leftAt === undefined ? undefined : schoolDate(data.leftAt);
       requireRule(
         joinedAt >= year.startDate &&
-          joinedAt <= year.endDate &&
-          (leftAt === undefined || (leftAt >= joinedAt && leftAt <= year.endDate)),
+          (!year.endDate || joinedAt <= year.endDate) &&
+          (leftAt === undefined ||
+            (leftAt >= joinedAt && (!year.endDate || leftAt <= year.endDate))),
         'Las fechas de matrícula deben estar ordenadas y dentro del ciclo.',
       );
       const attendance = await this.db.attendance
@@ -584,7 +622,7 @@ export class Repositories {
       const date = schoolDate(data.date);
       requireRule(
         date >= year.startDate &&
-          date <= year.endDate &&
+          (!year.endDate || date <= year.endDate) &&
           date >= enrollment.joinedAt &&
           (enrollment.leftAt === undefined || date <= enrollment.leftAt),
         'La asistencia debe estar dentro del ciclo y del intervalo de matrícula, incluidos sus extremos.',

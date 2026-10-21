@@ -25,7 +25,7 @@ export function AssignmentForm({
   const [initial] = useState(() => ({
     title: assignment?.title ?? '',
     description: assignment?.description ?? '',
-    assignedDate: assignment?.assignedDate ?? defaultDate(year),
+    assignedDate: assignment?.assignedDate ?? defaultDate(),
     dueDate: assignment?.dueDate ?? '',
   }));
   const [fields, setFields] = useState(initial);

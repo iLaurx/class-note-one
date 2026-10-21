@@ -30,7 +30,7 @@ export function NoteForm({
   const { repositories } = useStorage();
   const [initial] = useState(() => ({
     enrollmentId: note?.enrollmentId ?? selectedId,
-    date: note?.date ?? defaultDate(year),
+    date: note?.date ?? defaultDate(),
     category: note?.category ?? 'academic',
     body: note?.body ?? '',
   }));
@@ -56,7 +56,7 @@ export function NoteForm({
           note &&
           dirty &&
           !window.confirm(
-            `Se corregirá una observación de ${member ? fullName(member.student) : 'esta matrícula'} del ${note.date}. ¿Guardar la corrección del historial?`,
+            `Se corregirá una observación de ${member ? fullName(member.student) : 'este alumno'} del ${note.date}. ¿Guardar la corrección del historial?`,
           )
         ) {
           locked.current = false;
@@ -89,16 +89,16 @@ export function NoteForm({
       {error && <p role="alert">{error}</p>}
       {dirty && <p role="status">Cambios de observación sin guardar</p>}
       <label>
-        Alumno / matrícula
+        Alumno
         <select
-          aria-label="Alumno / matrícula"
+          aria-label="Alumno"
           autoFocus={!note}
           required
           disabled={busy || !!note}
           value={fields.enrollmentId}
           onChange={(event) => setFields({ ...fields, enrollmentId: event.target.value })}
         >
-          <option value="">Selecciona una matrícula</option>
+          <option value="">Selecciona un alumno</option>
           {members.map((item) => (
             <option key={item.enrollment.id} value={item.enrollment.id}>
               {fullName(item.student)}
@@ -106,8 +106,9 @@ export function NoteForm({
           ))}
         </select>
       </label>
-      {member && <p>{noteMemberCondition(member)}</p>}
-      {note && <p>La matrícula propietaria se conserva al editar.</p>}
+      {member && (member.enrollment.status !== 'active' || !member.student.active) && (
+        <p>{noteMemberCondition(member)}</p>
+      )}
       <label>
         Fecha de observación
         <input

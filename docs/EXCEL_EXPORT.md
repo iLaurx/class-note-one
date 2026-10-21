@@ -2,10 +2,12 @@
 
 ## Uso y contrato
 
-En Reportes, seleccionar ciclo/grupo y Desde/Hasta, luego Exportar Excel. Elegir
-nombre y ubicación en el diálogo nativo. Cancelar no escribe ni informa éxito;
-un error conserva las fechas para reintentar. El XLSX es un **reporte no restaurable**
-y contiene información educativa que debe protegerse. No promete cifrado.
+En Reportes, seleccionar Desde/Hasta y luego Exportar Excel. El grado activo se
+se configura junto con el nombre del grupo en Configuración. La barra lateral
+identifica el grupo activo. Elegir nombre y ubicación en el diálogo nativo. Cancelar no escribe ni
+informa éxito; un error conserva las fechas para reintentar. El XLSX es un
+**reporte no restaurable** y contiene información educativa que debe protegerse.
+No promete cifrado.
 
 - `src/features/reports/` → `Repositories.loadGroupReport` con IDs y rango explícitos
   → `src/services/export/` → `src/lib/tauri/saveReport.ts` → comando Rust.
@@ -13,8 +15,10 @@ y contiene información educativa que debe protegerse. No promete cifrado.
   ordenados; consulta por índices y lotes/bulkGet, sin N+1. No lee observaciones
   privadas ni ajustes, ni escribe o cambia schema Dexie v1.
 - **Alumnos contiene todas las matrículas del grupo independientemente del rango**,
-  incluidas inactivas/fichas archivadas. Matrícula es el UUID existente, no un folio
-  nuevo; estado es el de matrícula. No se deduce una salida de la auditoría/estado.
+  incluidas inactivas/fichas archivadas. Solo muestra nombre, grado y grupo; no
+  exporta identificador de matrícula, turno, estado ni fechas de ingreso/salida.
+- Alumno es la primera columna de las cuatro hojas. Su ancho se calcula con el
+  nombre más largo y no ajusta el texto en varias líneas.
 - Rango inclusivo para asistencia.date, assignments.assignedDate y readingLogs.date.
   La entrega de una tarea puede quedar fuera del rango. Se permiten rangos mayores
   que el ciclo: solo coinciden registros del contexto, sin inventar filas.
@@ -23,7 +27,8 @@ y contiene información educativa que debe protegerse. No promete cifrado.
   del mismo grupo incluso fuera de la población actual tras corregir intervalos.
   Una tarea sin destinatarios muestra Sin matrículas aplicables, sin inventar estado.
 - Exactamente Alumnos, Asistencia, Tareas y Lecturas. Encabezados en español,
-  cabecera fija/filtro, ajuste de texto y anchos de 18–48 caracteres. Opcionales
+  cabecera fija/filtro y ajuste de texto en las demás columnas, con anchos de
+  18–48 caracteres. Opcionales
   vacíos, minutos numéricos incluidos ceros; hoja vacía: Sin registros para este reporte.
 - Fechas DD/MM/AAAA como texto civil, sin convertir Date/UTC. Orden ascendente:
   alumnos por apellidos/nombres en español y UUID; asistencia/lecturas por fecha,

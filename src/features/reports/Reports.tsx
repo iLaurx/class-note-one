@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useStorage } from '../../app/useStorage';
 import { useWorkContext } from '../../app/useWorkContext';
 import type { GroupContext } from '../../db/repositories';
+import { defaultDate } from '../attendance/attendanceDomain';
 import { reportRange } from '../../services/export/reportRange';
 
 export function Reports() {
@@ -12,49 +13,39 @@ export function Reports() {
   return (
     <section className="school-management panel assignments-panel" aria-labelledby="reports-title">
       <h2 id="reports-title">Reportes del grupo</h2>
-      <p>
-        Exporta Alumnos, Asistencia, Tareas y Lecturas. El Excel es un reporte, no un respaldo
-        restaurable. No incluye observaciones privadas ni ajustes internos.
-      </p>
-      <p>
-        Alumnos incluye todas las matrículas del grupo, independientemente del rango. El rango
-        incluye ambos extremos y filtra asistencia por fecha, tareas por fecha de asignación y
-        lecturas por fecha.
-      </p>
-      <p>Protege el archivo exportado: contiene información del grupo.</p>
+      <p>Elige un periodo para descargar el registro de tu grupo.</p>
+      <details className="filter-disclosure">
+        <summary>Qué incluye el reporte</summary>
+        <p>Alumnos, asistencia, tareas y lecturas. Las observaciones privadas no se incluyen.</p>
+        <p>
+          Las fechas filtran la asistencia, la asignación de tareas y las lecturas. Se incluyen
+          todos los alumnos del grupo.
+        </p>
+        <p>
+          Guarda el archivo en un lugar privado. El Excel es un reporte; para recuperar tus datos
+          utiliza un respaldo.
+        </p>
+      </details>
       {busy || state.status === 'loading' ? (
         <p role="status">Cargando contexto…</p>
       ) : error || state.status === 'error' ? (
         <p>Reintenta desde el aviso de almacenamiento o contexto.</p>
       ) : !year || !group ? (
-        <p>Selecciona un ciclo y un grupo para exportar.</p>
+        <p>Configura tu grupo en Configuración para exportar.</p>
       ) : (
         <ReportForm
           key={`${year.id}:${group.id}`}
           context={{ schoolYearId: year.id, groupId: group.id }}
-          startDate={year.startDate}
-          endDate={year.endDate}
-          label={`${group.grade}.º ${group.name} · Ciclo ${year.label}`}
         />
       )}
     </section>
   );
 }
 
-function ReportForm({
-  context,
-  startDate,
-  endDate,
-  label,
-}: {
-  context: GroupContext;
-  startDate: string;
-  endDate: string;
-  label: string;
-}) {
+function ReportForm({ context }: { context: GroupContext }) {
   const { repositories } = useStorage();
-  const [from, setFrom] = useState(startDate),
-    [to, setTo] = useState(endDate);
+  const [from, setFrom] = useState(() => defaultDate()),
+    [to, setTo] = useState(() => defaultDate());
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState(''),
     [error, setError] = useState('');
@@ -111,7 +102,6 @@ function ReportForm({
         })();
       }}
     >
-      <p>{label}</p>
       <label>
         Desde
         <input

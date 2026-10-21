@@ -2,8 +2,9 @@
 
 ClassNote v0.1.0 es una aplicación de Windows para docentes de primaria, con
 interfaz en español y datos locales. Gestiona ciclos, grupos, alumnos y matrículas,
-asistencia, tareas y entregas, lecturas y observaciones. Inicio resume el grupo
-seleccionado. No hay cuentas, servidor, sincronización ni actualizador automático.
+asistencia, tareas y entregas, lecturas y observaciones. Cada ciclo admite un solo
+grupo activo, identificado en la barra lateral. No hay cuentas, servidor, sincronización
+ni actualizador automático.
 
 ## Instalar y empezar
 

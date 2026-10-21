@@ -44,7 +44,7 @@ function exactKeys(row: Record<string, unknown>, required: string[], optional: s
   );
 }
 const fields: Record<TableName, [string[], string[]]> = {
-  schoolYears: [['label', 'startDate', 'endDate', 'archived'], []],
+  schoolYears: [['label', 'startDate', 'archived'], ['endDate']],
   groups: [['schoolYearId', 'grade', 'name', 'archived'], ['shift']],
   students: [['firstName', 'lastName', 'active'], []],
   enrollments: [['studentId', 'groupId', 'joinedAt', 'status'], ['leftAt']],
@@ -127,9 +127,9 @@ export function validateRows(rows: BackupRows) {
     requireRule(
       typeof date === 'string' &&
         typeof from === 'string' &&
-        typeof to === 'string' &&
+        (to === undefined || typeof to === 'string') &&
         date >= from &&
-        date <= to,
+        (to === undefined || date <= to),
       'El respaldo contiene fechas fuera de su intervalo.',
     );
   };

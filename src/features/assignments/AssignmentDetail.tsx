@@ -58,10 +58,7 @@ export function AssignmentDetail({
           {day.detail.assignment.description && (
             <p className="assignment-description">{day.detail.assignment.description}</p>
           )}
-          <p>
-            Recuentos de toda la tarea{day.dirty ? ' · Vista previa' : ''}. {changes} cambios
-            pendientes en total, incluidas filas ocultas por filtros.
-          </p>
+          {day.dirty && <p role="status">{changes} cambios sin guardar</p>}
           <dl className="attendance-counts" aria-label="Recuentos de toda la tarea">
             {Object.entries(submissionLabels).map(([key, label]) => (
               <div key={key}>
@@ -74,31 +71,34 @@ export function AssignmentDetail({
               <dd>{counts.uncaptured}</dd>
             </div>
             <div>
-              <dt>Total de matrículas</dt>
+              <dt>Alumnos</dt>
               <dd>{counts.total}</dd>
             </div>
           </dl>
-          <div className="assignment-filters">
-            <label>
-              Buscar alumno
-              <input value={query} onChange={(event) => setQuery(event.target.value)} />
-            </label>
-            <label>
-              Filtrar entregas por estado
-              <select value={status} onChange={(event) => setStatus(event.target.value)}>
-                <option value="">Todos</option>
-                {Object.entries(submissionLabels).map(([key, label]) => (
-                  <option key={key} value={key}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+          <details className="filter-disclosure">
+            <summary>Buscar y filtrar alumnos</summary>
+            <div className="assignment-filters">
+              <label>
+                Buscar alumno
+                <input value={query} onChange={(event) => setQuery(event.target.value)} />
+              </label>
+              <label>
+                Filtrar entregas por estado
+                <select value={status} onChange={(event) => setStatus(event.target.value)}>
+                  <option value="">Todos</option>
+                  {Object.entries(submissionLabels).map(([key, label]) => (
+                    <option key={key} value={key}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </details>
           <button disabled={day.busy || !changes} onClick={() => void day.save()}>
-            Guardar entregas ({changes} cambios en toda la tarea)
+            Guardar entregas ({changes})
           </button>
-          {!day.rows.length && <p>No hay matrículas para la fecha de asignación.</p>}
+          {!day.rows.length && <p>No hay alumnos en esta fecha.</p>}
           {day.rows.length > 0 &&
             !day.detail.rows.some(
               (member, index) =>
@@ -127,26 +127,24 @@ export function AssignmentDetail({
                         Matrícula inactiva{!enrollment.leftAt ? ' · Sin salida registrada' : ''}
                       </p>
                     )}
-                    {!row.expected && <p>Aún no tiene registro guardado</p>}
                     {submissionChanged(row) && <p>Cambios pendientes</p>}
                   </div>
-                  <label>
-                    Estado de {name}
-                    <select
-                      aria-label={`Estado de ${name}`}
-                      disabled={day.busy}
-                      value={row.status}
-                      onChange={(event) =>
-                        day.edit(enrollment.id, { status: event.target.value as SubmissionStatus })
-                      }
-                    >
-                      {Object.entries(submissionLabels).map(([key, label]) => (
-                        <option key={key} value={key}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <div className="status-options" role="group" aria-label={`Estado de ${name}`}>
+                    {Object.entries(submissionLabels).map(([status, label]) => (
+                      <button
+                        type="button"
+                        key={status}
+                        disabled={day.busy}
+                        aria-pressed={row.status === status}
+                        data-status={status}
+                        onClick={() =>
+                          day.edit(enrollment.id, { status: status as SubmissionStatus })
+                        }
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                   <label>
                     Comentario de {name} (opcional)
                     <input

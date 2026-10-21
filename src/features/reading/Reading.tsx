@@ -14,10 +14,8 @@ export function Reading() {
   const groupId = data?.selection.groupId;
   return (
     <section className="attendance assignments" aria-label="Lecturas del grupo">
-      <h2>Lecturas del grupo</h2>
-      <a href="#/inicio">Volver a Inicio</a>
       {!year || !groupId ? (
-        <p>Selecciona un ciclo y un grupo para registrar lecturas.</p>
+        <p>Configura tu grupo en Configuración para registrar lecturas.</p>
       ) : (
         <ReadingWorkspace key={`${year.id}:${groupId}`} year={year} groupId={groupId} />
       )}
@@ -37,7 +35,7 @@ function ReadingWorkspace({ year, groupId }: { year: SchoolYear; groupId: string
   const [enrollmentId, setEnrollmentId] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const [weekDate, setWeekDate] = useState(defaultDate(year) || year.startDate);
+  const [weekDate, setWeekDate] = useState(defaultDate());
   const sequence = useRef(0);
   const load = useCallback(async () => {
     if (!repositories) return;
@@ -50,7 +48,7 @@ function ReadingWorkspace({ year, groupId }: { year: SchoolYear; groupId: string
     } catch {
       if (sequence.current === token) {
         setData(null);
-        setError('No se pudieron consultar las lecturas. Reintenta solo la lectura.');
+        setError('No se pudieron consultar las lecturas. Inténtalo de nuevo.');
       }
     } finally {
       if (sequence.current === token) setBusy(false);
@@ -96,7 +94,7 @@ function ReadingWorkspace({ year, groupId }: { year: SchoolYear; groupId: string
       {!form && data && !busy && (
         <>
           {!data.members.length ? (
-            <p>Este grupo aún no tiene matrículas. Agrega alumnos para registrar lecturas.</p>
+            <p>Agrega alumnos para registrar lecturas.</p>
           ) : (
             <button
               onClick={() => {
@@ -107,60 +105,66 @@ function ReadingWorkspace({ year, groupId }: { year: SchoolYear; groupId: string
               Registrar lectura
             </button>
           )}
-          <section aria-label="Historial individual">
-            <h3>Historial individual</h3>
-            <div className="assignment-filters">
-              <label>
-                Matrícula del historial
-                <select
-                  aria-label="Matrícula del historial"
-                  value={enrollmentId}
-                  onChange={(event) => setEnrollmentId(event.target.value)}
-                >
-                  <option value="">Selecciona una matrícula</option>
-                  {data.members.map((item) => (
-                    <option key={item.enrollment.id} value={item.enrollment.id}>
-                      {fullName(item.student)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Lecturas desde
-                <input type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
-              </label>
-              <label>
-                Lecturas hasta
-                <input type="date" value={to} onChange={(event) => setTo(event.target.value)} />
-              </label>
-            </div>
-            {member && <p>{memberCondition(member)}</p>}
-            {filterError && <p role="alert">{filterError}</p>}
-            {!enrollmentId ? (
-              <p>Selecciona una matrícula para consultar su historial.</p>
-            ) : (
-              !filterError && !history.length && <p>Sin lecturas para esta matrícula y rango.</p>
-            )}
-            <ul className="school-list">
-              {history.map((log) => (
-                <li key={log.id}>
-                  <strong>{log.title}</strong>
-                  <span>
-                    {log.date} · {log.minutes} minutos
-                  </span>
-                  {log.comment && <p className="assignment-description">{log.comment}</p>}
-                  <button
-                    onClick={() => {
-                      setSaved(false);
-                      setForm({ reading: log });
-                    }}
+          <details className="filter-disclosure">
+            <summary>Ver lecturas por alumno</summary>
+            <section aria-label="Historial individual">
+              <div className="assignment-filters">
+                <label>
+                  Alumno
+                  <select
+                    aria-label="Alumno"
+                    value={enrollmentId}
+                    onChange={(event) => setEnrollmentId(event.target.value)}
                   >
-                    Editar lectura {log.title} del {log.date}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
+                    <option value="">Selecciona un alumno</option>
+                    {data.members.map((item) => (
+                      <option key={item.enrollment.id} value={item.enrollment.id}>
+                        {fullName(item.student)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Lecturas desde
+                  <input
+                    type="date"
+                    value={from}
+                    onChange={(event) => setFrom(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Lecturas hasta
+                  <input type="date" value={to} onChange={(event) => setTo(event.target.value)} />
+                </label>
+              </div>
+              {member && <p>{memberCondition(member)}</p>}
+              {filterError && <p role="alert">{filterError}</p>}
+              {!enrollmentId ? (
+                <p>Selecciona un alumno para consultar su historial.</p>
+              ) : (
+                !filterError && !history.length && <p>Sin lecturas en este periodo.</p>
+              )}
+              <ul className="school-list">
+                {history.map((log) => (
+                  <li key={log.id}>
+                    <strong>{log.title}</strong>
+                    <span>
+                      {log.date} · {log.minutes} minutos
+                    </span>
+                    {log.comment && <p className="assignment-description">{log.comment}</p>}
+                    <button
+                      onClick={() => {
+                        setSaved(false);
+                        setForm({ reading: log });
+                      }}
+                    >
+                      Editar lectura {log.title} del {log.date}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          </details>
           <section aria-label="Resumen semanal">
             <h3>Resumen semanal</h3>
             <label className="attendance-date">
@@ -172,10 +176,7 @@ function ReadingWorkspace({ year, groupId }: { year: SchoolYear; groupId: string
                 onChange={(event) => setWeekDate(event.target.value)}
               />
             </label>
-            <p>
-              Toda la semana seleccionada del grupo, independiente del filtro del historial. De
-              lunes a domingo.
-            </p>
+
             {!summary ? (
               <p>Elige una fecha real para consultar la semana.</p>
             ) : (
@@ -191,7 +192,9 @@ function ReadingWorkspace({ year, groupId }: { year: SchoolYear; groupId: string
                   {summary.rows.map((row) => (
                     <li key={row.enrollment.id}>
                       <strong>{fullName(row.student)}</strong>
-                      <span>{memberCondition(row)}</span>
+                      {(row.enrollment.status !== 'active' || !row.student.active) && (
+                        <span>{memberCondition(row)}</span>
+                      )}
                       <span>
                         {row.minutes} minutos · {row.count} registros
                       </span>

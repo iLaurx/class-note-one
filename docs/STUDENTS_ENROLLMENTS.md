@@ -5,11 +5,10 @@ Alcance exclusivo: fichas globales, pertenencia al grupo, búsqueda, detalle e h
 ## Uso
 
 1. Seleccionar ciclo/grupo en Contexto de trabajo. Alumnos consulta únicamente ese grupo; búsqueda local y filtro de matrículas inactivas son independientes del contexto.
-2. «Agregar alumno» permite buscar primero las fichas globales. Crear nombre/apellidos y fecha de ingreso guarda ficha y matrícula atómicamente. Los homónimos se permiten; UUID, creación e historial ayudan a distinguirlos.
-3. «Matricular alumno existente» busca fichas de todos los grupos. Una ficha activa se matricula sin duplicarla. Una matrícula ya activa se informa y bloquea; una inactiva se reactiva confirmando el intervalo. Un alumno archivado puede reactivarse explícitamente en este flujo.
-4. «Ver ficha» muestra estado global e historial, ciclos/grupos/grados/turnos/fechas y avisos de archivo. Editar ficha conserva identidad. Las acciones de matrícula solo apuntan al grupo seleccionado; para actuar sobre otra pertenencia hay que cambiar el contexto.
-5. «Corregir fechas», baja y reactivación validan días reales dentro del ciclo y todas las asistencias dentro del intervalo inclusivo. Baja requiere confirmar y no inventa salida. Reactivar permite conservar, corregir o vaciar salida de forma explícita.
-6. «Archivar alumno» confirma nombre y número de matrículas activas afectadas. Desactiva ficha y matrículas en una transacción, conserva fechas e historial. Reactivar ficha deja matrículas inactivas. Cancelar cualquier confirmación/formulario no escribe.
+2. «Agregar alumno» crea una ficha con nombre/apellidos y matrícula en el grupo actual, en una operación atómica.
+3. «Ver ficha» muestra estado global e historial, ciclos/grupos/grados/turnos/fechas y avisos de archivo. Editar ficha conserva identidad. Las acciones de matrícula solo apuntan al grupo seleccionado; para actuar sobre otra pertenencia hay que cambiar el contexto.
+4. «Corregir fechas», baja y reactivación validan días reales dentro del ciclo (con fin opcional) y todas las asistencias dentro del intervalo inclusivo. Baja requiere confirmar y no inventa salida. Reactivar permite conservar, corregir o vaciar salida de forma explícita.
+5. «Archivar alumno» confirma nombre y número de matrículas activas afectadas. Desactiva ficha y matrículas en una transacción, conserva fechas e historial. Reactivar ficha deja matrículas inactivas. Cancelar cualquier confirmación/formulario no escribe.
 
 Un cambio de contexto cierra formularios/detalles; el aviso visible explica la invalidación. Los datos anteriores no se presentan bajo el nuevo grupo. Errores de escritura conservan campos; fallo de consulta tras guardado confirmado cierra el formulario e informa para reintentar solo la consulta.
 

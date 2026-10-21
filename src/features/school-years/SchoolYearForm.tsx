@@ -1,18 +1,19 @@
 import { useState, type SubmitEvent } from 'react';
 import type { SchoolYear } from '../../domain/models';
+import { defaultDate } from '../attendance/attendanceDomain';
 import { useWorkContext } from '../../app/useWorkContext';
 export function SchoolYearForm({ year, done }: { year?: SchoolYear; done: () => void }) {
   const { busy, run } = useWorkContext();
   const [label, setLabel] = useState(year?.label ?? '');
-  const [startDate, setStart] = useState(year?.startDate ?? '');
+  const [startDate, setStart] = useState(() => year?.startDate ?? defaultDate());
   const [endDate, setEnd] = useState(year?.endDate ?? '');
   async function save(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (
       await run((r) =>
         year
-          ? r.updateSchoolYear(year.id, { label, startDate, endDate })
-          : r.createSchoolYear({ label, startDate, endDate }),
+          ? r.updateSchoolYear(year.id, { label, startDate, endDate: endDate || undefined })
+          : r.createSchoolYear({ label, startDate, endDate: endDate || undefined }),
       )
     )
       done();
@@ -33,8 +34,8 @@ export function SchoolYearForm({ year, done }: { year?: SchoolYear; done: () => 
         <input required type="date" value={startDate} onChange={(e) => setStart(e.target.value)} />
       </label>
       <label>
-        Fecha de fin
-        <input required type="date" value={endDate} onChange={(e) => setEnd(e.target.value)} />
+        Fecha de fin (opcional)
+        <input type="date" value={endDate} onChange={(e) => setEnd(e.target.value)} />
       </label>
       <div>
         <button disabled={busy} type="submit">

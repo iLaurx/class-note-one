@@ -1,3 +1,4 @@
+import { ClipboardList } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useWorkContext } from '../../app/useWorkContext';
 import { useStorage } from '../../app/useStorage';
@@ -14,10 +15,8 @@ export function Assignments() {
   const groupId = data?.selection.groupId;
   return (
     <section className="attendance assignments" aria-label="Tareas del grupo">
-      <h2>Tareas del grupo</h2>
-      <a href="#/inicio">Volver a Inicio</a>
       {!year || !groupId ? (
-        <p>Selecciona un ciclo y un grupo para gestionar tareas.</p>
+        <p>Configura tu grupo en Configuración para gestionar tareas.</p>
       ) : (
         <AssignmentWorkspace key={`${year.id}:${groupId}`} year={year} groupId={groupId} />
       )}
@@ -55,7 +54,7 @@ function AssignmentWorkspace({ year, groupId }: { year: SchoolYear; groupId: str
     } catch {
       if (sequence.current === token) {
         setRows(null);
-        setError('No se pudo consultar el listado. Reintenta solo la lectura.');
+        setError('No se pudo consultar el listado. Inténtalo de nuevo.');
       }
     } finally {
       if (sequence.current === token) setBusy(false);
@@ -80,6 +79,14 @@ function AssignmentWorkspace({ year, groupId }: { year: SchoolYear; groupId: str
     }
   }
   const filtered = filterAssignments(rows ?? [], query, from, to);
+  const days = new Map<string, Assignment[]>();
+  for (const assignment of filtered) {
+    const day = days.get(assignment.assignedDate) ?? [];
+    day.push(assignment);
+    days.set(assignment.assignedDate, day);
+  }
+  const dateLabel = (date: string, options: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat('es-MX', options).format(new Date(`${date}T12:00:00`));
   return (
     <div aria-busy={busy}>
       {saved && <p role="status">La tarea se guardó.</p>}
@@ -113,44 +120,94 @@ function AssignmentWorkspace({ year, groupId }: { year: SchoolYear; groupId: str
             void load();
           }}
         />
+      ) : view.type === 'detail' ? (
+        <AssignmentDetail key={viewVersion} context={context} assignmentId={view.id} />
       ) : (
         <>
-          <div className="assignment-filters">
-            <label>
-              Buscar tareas por título
-              <input value={query} onChange={(event) => setQuery(event.target.value)} />
-            </label>
-            <label>
-              Asignación desde
-              <input type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
-            </label>
-            <label>
-              Asignación hasta
-              <input type="date" value={to} onChange={(event) => setTo(event.target.value)} />
-            </label>
-          </div>
+          <details className="filter-disclosure">
+            <summary>Buscar y filtrar</summary>
+            <div className="assignment-filters">
+              <label>
+                Buscar tareas por título
+                <input value={query} onChange={(event) => setQuery(event.target.value)} />
+              </label>
+              <label>
+                Asignación desde
+                <input type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
+              </label>
+              <label>
+                Asignación hasta
+                <input type="date" value={to} onChange={(event) => setTo(event.target.value)} />
+              </label>
+            </div>
+          </details>
           {rows && !rows.length && <p>Este grupo aún no tiene tareas.</p>}
           {rows && rows.length > 0 && !filtered.length && <p>Sin coincidencias de tareas.</p>}
-          <ul className="school-list">
-            {filtered.map((assignment) => (
-              <li key={assignment.id}>
-                <strong>{assignment.title}</strong>
-                <span>
-                  Asignación: {assignment.assignedDate} · Entrega:{' '}
-                  {assignment.dueDate ?? 'Sin fecha'}
-                </span>
-                <button onClick={() => navigate({ type: 'detail', id: assignment.id })}>
-                  Ver entregas de {assignment.title}
-                </button>
-                <button onClick={() => navigate({ type: 'form', assignment })}>
-                  Editar tarea {assignment.title}
-                </button>
-              </li>
+          <div className="assignment-days">
+            {Array.from(days, ([date, assignments]) => (
+              <section className="assignment-day" key={date} aria-labelledby={`day-${date}`}>
+                <header className="assignment-day-heading">
+                  <div className="assignment-day-date">
+                    <span className="day-number" aria-hidden="true">
+                      {date.slice(8)}
+                    </span>
+                    <div>
+                      <h3 id={`day-${date}`}>{dateLabel(date, { weekday: 'long' })}</h3>
+                      <time dateTime={date}>
+                        {dateLabel(date, { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </time>
+                    </div>
+                  </div>
+                  <span className="day-task-count">
+                    {assignments.length} {assignments.length === 1 ? 'tarea' : 'tareas'}
+                  </span>
+                </header>
+                <ul className="assignment-card-grid">
+                  {assignments.map((assignment) => (
+                    <li className="assignment-card" key={assignment.id}>
+                      <span className="icon-tile">
+                        <ClipboardList size={19} aria-hidden="true" />
+                      </span>
+                      <h4>{assignment.title}</h4>
+                      {assignment.description && (
+                        <p className="assignment-card-description">{assignment.description}</p>
+                      )}
+                      <p className="assignment-card-due">
+                        {assignment.dueDate ? (
+                          <>
+                            Entrega:{' '}
+                            <time dateTime={assignment.dueDate}>
+                              {dateLabel(assignment.dueDate, {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric',
+                              })}
+                            </time>
+                          </>
+                        ) : (
+                          'Sin fecha de entrega'
+                        )}
+                      </p>
+                      <div className="assignment-card-actions">
+                        <button
+                          aria-label={`Ver entregas de ${assignment.title}`}
+                          onClick={() => navigate({ type: 'detail', id: assignment.id })}
+                        >
+                          Ver entregas
+                        </button>
+                        <button
+                          aria-label={`Editar tarea ${assignment.title}`}
+                          onClick={() => navigate({ type: 'form', assignment })}
+                        >
+                          Editar
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             ))}
-          </ul>
-          {view.type === 'detail' && (
-            <AssignmentDetail key={viewVersion} context={context} assignmentId={view.id} />
-          )}
+          </div>
         </>
       )}
     </div>

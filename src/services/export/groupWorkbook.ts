@@ -43,6 +43,16 @@ export async function groupWorkbook(data: GroupReport): Promise<Uint8Array> {
       column.width = Math.min(48, Math.max(18, headers[index]!.length + 4));
       column.alignment = { vertical: 'top', wrapText: true };
     });
+    const studentColumnIndex = headers.indexOf('Alumno');
+    if (studentColumnIndex >= 0) {
+      const longestName = rows.reduce((longest, row) => {
+        const value = row[studentColumnIndex];
+        return typeof value === 'string' ? Math.max(longest, safeCell(value).length) : longest;
+      }, headers[studentColumnIndex]!.length);
+      const studentColumn = sheet.getColumn(studentColumnIndex + 1);
+      studentColumn.width = Math.min(255, Math.max(18, Math.ceil(longestName * 1.2) + 2));
+      studentColumn.alignment = { vertical: 'top', wrapText: false };
+    }
     sheet.autoFilter = {
       from: { row: 1, column: 1 },
       to: { row: Math.max(1, rows.length + 1), column: headers.length },
@@ -52,30 +62,12 @@ export async function groupWorkbook(data: GroupReport): Promise<Uint8Array> {
   };
   addSheet(
     'Alumnos',
-    [
-      'Matrícula',
-      'Alumno',
-      'Grado',
-      'Grupo',
-      'Turno',
-      'Estado',
-      'Fecha de matrícula',
-      'Fecha de salida',
-    ],
-    members.map((row) => [
-      row.id,
-      names.get(row.id)!,
-      data.group.grade,
-      data.group.name,
-      data.group.shift ?? '',
-      row.status === 'active' ? 'Activa' : 'Inactiva',
-      day(row.joinedAt),
-      day(row.leftAt),
-    ]),
+    ['Alumno', 'Grado', 'Grupo'],
+    members.map((row) => [names.get(row.id)!, data.group.grade, data.group.name]),
   );
   addSheet(
     'Asistencia',
-    ['Fecha', 'Alumno', 'Estado', 'Nota'],
+    ['Alumno', 'Fecha', 'Estado', 'Nota'],
     [...data.attendance]
       .sort(
         (a, b) =>
@@ -84,8 +76,8 @@ export async function groupWorkbook(data: GroupReport): Promise<Uint8Array> {
           a.id.localeCompare(b.id),
       )
       .map((row) => [
-        day(row.date),
         names.get(row.enrollmentId)!,
+        day(row.date),
         attendanceLabels[row.status],
         row.note ?? '',
       ]),
@@ -104,11 +96,11 @@ export async function groupWorkbook(data: GroupReport): Promise<Uint8Array> {
     for (const member of recipients.length ? recipients : [null]) {
       const submission = member ? submissions.get(`${task.id}:${member.id}`) : undefined;
       taskRows.push([
+        member ? names.get(member.id)! : 'Sin matrículas aplicables',
         task.title,
         task.description ?? '',
         day(task.assignedDate),
         day(task.dueDate),
-        member ? names.get(member.id)! : 'Sin matrículas aplicables',
         member ? submissionLabels[submission?.status ?? 'pending'] : '',
         submission?.comment ?? '',
       ]);
@@ -117,11 +109,11 @@ export async function groupWorkbook(data: GroupReport): Promise<Uint8Array> {
   addSheet(
     'Tareas',
     [
+      'Alumno',
       'Tarea',
       'Descripción',
       'Fecha de asignación',
       'Fecha de entrega',
-      'Alumno',
       'Estado de entrega',
       'Comentario',
     ],
@@ -129,7 +121,7 @@ export async function groupWorkbook(data: GroupReport): Promise<Uint8Array> {
   );
   addSheet(
     'Lecturas',
-    ['Fecha', 'Alumno', 'Título', 'Minutos', 'Comentario'],
+    ['Alumno', 'Fecha', 'Título', 'Minutos', 'Comentario'],
     [...data.readings]
       .sort(
         (a, b) =>
@@ -138,8 +130,8 @@ export async function groupWorkbook(data: GroupReport): Promise<Uint8Array> {
           a.id.localeCompare(b.id),
       )
       .map((row) => [
-        day(row.date),
         names.get(row.enrollmentId)!,
+        day(row.date),
         row.title,
         row.minutes,
         row.comment ?? '',
