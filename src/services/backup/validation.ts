@@ -8,6 +8,7 @@ import {
   text,
   uuid,
 } from '../../domain/validation.ts';
+import { BackupOperationError } from './errors.ts';
 
 export const TABLE_NAMES = Object.keys(SCHEMA_V1) as (keyof typeof SCHEMA_V1)[];
 export type TableName = (typeof TABLE_NAMES)[number];
@@ -47,7 +48,10 @@ const fields: Record<TableName, [string[], string[]]> = {
   schoolYears: [['label', 'startDate', 'archived'], ['endDate']],
   groups: [['schoolYearId', 'grade', 'name', 'archived'], ['shift']],
   students: [['firstName', 'lastName', 'active'], []],
-  enrollments: [['studentId', 'groupId', 'joinedAt', 'status'], ['leftAt']],
+  enrollments: [
+    ['studentId', 'groupId', 'status'],
+    ['leftAt', 'joinedAt'],
+  ],
   attendance: [['enrollmentId', 'date', 'status'], ['note']],
   assignments: [
     ['groupId', 'title', 'assignedDate'],
@@ -138,7 +142,7 @@ export function validateRows(rows: BackupRows) {
     const enrollment = find('enrollments', id),
       year = yearOf(enrollment.groupId);
     inRange(date, year.startDate, year.endDate);
-    inRange(date, enrollment.joinedAt, enrollment.leftAt ?? year.endDate);
+    inRange(date, year.startDate, enrollment.leftAt ?? year.endDate);
     return enrollment;
   };
   for (const row of rows.schoolYears) inRange(row.startDate, row.startDate, row.endDate);
@@ -146,8 +150,7 @@ export function validateRows(rows: BackupRows) {
   for (const row of rows.enrollments) {
     find('students', row.studentId);
     const year = yearOf(row.groupId);
-    inRange(row.joinedAt, year.startDate, year.endDate);
-    if (row.leftAt !== undefined) inRange(row.leftAt, row.joinedAt, year.endDate);
+    if (row.leftAt !== undefined) inRange(row.leftAt, year.startDate, year.endDate);
   }
   for (const name of ['attendance', 'readingLogs', 'studentNotes'] as const)
     for (const row of rows[name]) enrollmentDate(row.enrollmentId, row.date);
@@ -163,8 +166,14 @@ export function validateRows(rows: BackupRows) {
   }
 }
 
-export function parseBackup(source: string) {
-  const envelope = record(JSON.parse(source) as unknown);
+function parseBackupInternal(source: string) {
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(source) as unknown;
+  } catch (cause) {
+    throw new BackupOperationError('invalid-json', cause);
+  }
+  const envelope = record(decoded);
   exactKeys(envelope, [
     'format',
     'formatVersion',
@@ -173,26 +182,28 @@ export function parseBackup(source: string) {
     'createdAt',
     'data',
   ]);
-  requireRule(
+  if (
     envelope.format === 'classnote-backup' &&
-      envelope.formatVersion === 1 &&
-      envelope.schemaVersion === 1 &&
-      envelope.appVersion === '0.1.0',
-    'Formato o versión de respaldo incompatible.',
-  );
+    envelope.formatVersion === 1 &&
+    envelope.schemaVersion === 1 &&
+    envelope.appVersion === '0.1.0'
+  ) {
+    // Continue parsing the supported envelope.
+  } else {
+    throw new BackupOperationError(
+      'incompatible',
+      new Error('Formato o versión de respaldo incompatible.'),
+    );
+  }
   const createdAt = timestamp(envelope.createdAt);
   const payload = record(envelope.data);
   exactKeys(payload, ['formatName', 'formatVersion', 'data']);
-  requireRule(
-    payload.formatName === 'dexie' && payload.formatVersion === 1,
-    'Formato Dexie incompatible.',
-  );
+  if (!(payload.formatName === 'dexie' && payload.formatVersion === 1))
+    throw new BackupOperationError('incompatible', new Error('Formato Dexie incompatible.'));
   const data = record(payload.data);
   exactKeys(data, ['databaseName', 'databaseVersion', 'tables', 'data']);
-  requireRule(
-    data.databaseName === 'classnote' && data.databaseVersion === 1,
-    'Esquema incompatible.',
-  );
+  if (!(data.databaseName === 'classnote' && data.databaseVersion === 1))
+    throw new BackupOperationError('incompatible', new Error('Esquema incompatible.'));
   requireRule(
     Array.isArray(data.tables) && data.tables.length === 10 && Array.isArray(data.data),
     'Faltan tablas del respaldo.',
@@ -209,7 +220,8 @@ export function parseBackup(source: string) {
     requireRule(!seen.has(name), 'Tabla repetida.');
     seen.add(name);
     // Dexie emits canonical index strings without whitespace.
-    requireRule(table.schema === SCHEMA_V1[name].replaceAll(' ', ''), 'Índices incompatibles.');
+    if (table.schema !== SCHEMA_V1[name].replaceAll(' ', ''))
+      throw new BackupOperationError('incompatible', new Error('Índices incompatibles.'));
     counts[name] = integer(table.rowCount, 0, Number.MAX_SAFE_INTEGER, 'Registros');
   }
   const chunks = new Set<string>();
@@ -246,7 +258,11 @@ export function parseBackup(source: string) {
       chunks.has(name) && counts[name] === rows[name].length,
       'Respaldo incompleto: conteos incorrectos.',
     );
-  validateRows(rows);
+  try {
+    validateRows(rows);
+  } catch (cause) {
+    throw new BackupOperationError('invalid-data', cause);
+  }
   return {
     createdAt,
     appVersion: '0.1.0',
@@ -256,4 +272,13 @@ export function parseBackup(source: string) {
     rows,
     payload,
   };
+}
+
+export function parseBackup(source: string) {
+  try {
+    return parseBackupInternal(source);
+  } catch (cause) {
+    if (cause instanceof BackupOperationError) throw cause;
+    throw new BackupOperationError('invalid-data', cause);
+  }
 }

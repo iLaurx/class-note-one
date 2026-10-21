@@ -10,6 +10,59 @@ import {
   submissionCounts,
 } from '../../src/features/assignments/assignmentDomain.ts';
 const date = '2026-10-19';
+
+test('eliminar tarea borra sus entregas y comentarios y conserva los demás datos', async (t) => {
+  const { db, r } = setup();
+  t.after(() => db.delete());
+  const f = await createFixture(r);
+  const other = await createFixture(r, 'Otro');
+  for (const fixture of [f, other])
+    await r.createSubmission(fixture.enrollmentContext, {
+      assignmentId: fixture.assignment.id,
+      status: 'submitted',
+      comment: 'Comentario guardado',
+    });
+  await r.deleteAssignment(f.context, f.assignment.id, f.assignment, true);
+  assert.equal(await db.assignments.get(f.assignment.id), undefined);
+  assert.equal(await db.submissions.where('assignmentId').equals(f.assignment.id).count(), 0);
+  assert.deepEqual(await db.assignments.toArray(), [other.assignment]);
+  assert.equal(await db.submissions.count(), 1);
+  assert.equal(await db.students.count(), 2);
+  assert.equal(await db.enrollments.count(), 2);
+  await assert.rejects(r.loadAssignment(f.context, f.assignment.id));
+});
+
+test('eliminar tarea requiere confirmación, contexto correcto y datos vigentes', async (t) => {
+  const { db, r } = setup();
+  t.after(() => db.delete());
+  const f = await createFixture(r);
+  const other = await createFixture(r, 'Otro');
+  await assert.rejects(r.deleteAssignment(f.context, f.assignment.id, f.assignment, false));
+  await assert.rejects(r.deleteAssignment(other.context, f.assignment.id, f.assignment, true));
+  await r.updateAssignment(f.context, f.assignment.id, { ...f.assignment, title: 'Corregida' });
+  await assert.rejects(
+    r.deleteAssignment(f.context, f.assignment.id, f.assignment, true),
+    /otra ventana/,
+  );
+  assert.equal(await db.assignments.count(), 2);
+});
+
+test('fallo al eliminar la tarea revierte también el borrado de entregas', async (t) => {
+  const { db, r } = setup();
+  t.after(() => db.delete());
+  const f = await createFixture(r);
+  const submission = await r.createSubmission(f.enrollmentContext, {
+    assignmentId: f.assignment.id,
+    status: 'submitted',
+    comment: 'Conservar si falla',
+  });
+  db.assignments.hook('deleting', () => {
+    throw new Error('Fallo simulado');
+  });
+  await assert.rejects(r.deleteAssignment(f.context, f.assignment.id, f.assignment, true));
+  assert.deepEqual(await db.assignments.get(f.assignment.id), f.assignment);
+  assert.deepEqual(await db.submissions.get(submission.id), submission);
+});
 function setup() {
   const db = new ClassNoteDatabase(`cn007-${crypto.randomUUID()}`);
   return { db, r: new Repositories(db) };

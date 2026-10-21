@@ -19,11 +19,14 @@ function subscribe(onChange: () => void) {
   return () => window.removeEventListener('hashchange', change);
 }
 
-export function useNavigation() {
-  const hash = useSyncExternalStore(
+export function useLocationHash() {
+  return useSyncExternalStore(
     subscribe,
     () => window.location.hash,
     () => '',
   );
-  return resolveSection(hash || '#/inicio');
+}
+
+export function useNavigation() {
+  return resolveSection(useLocationHash() || '#/inicio');
 }

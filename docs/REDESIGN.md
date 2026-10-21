@@ -2,7 +2,7 @@
 
 La interfaz prioriza el trabajo diario de una maestra con un solo grupo pequeño. No impone un límite de siete alumnos ni agrega datos de ejemplo a la aplicación.
 
-- Navegación superior: Inicio, Alumnos, Asistencia y Tareas. Lectura, Observaciones, Reportes y Configuración están en Más.
+- Navegación lateral: todas las secciones aparecen visibles, junto al grupo y el ciclo activos. En pantallas estrechas se convierte en una cabecera compacta con enlaces en dos columnas.
 - Inicio: acción para pasar lista, tres cifras del grupo y tareas recientes o próximas. La base vacía muestra cómo configurar el grupo.
 - Asistencia: botones por alumno, notas opcionales desplegables, recuentos compactos y guardado explícito. Se mantiene la protección de borradores y la confirmación de correcciones.
 - Tareas: listado, formulario y entregas en vistas separadas. Los filtros se despliegan cuando se necesitan.

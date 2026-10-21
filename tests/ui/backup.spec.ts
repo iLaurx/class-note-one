@@ -49,12 +49,15 @@ async function prepare(page: Page) {
           if (command === 'open_backup')
             return check.mode === 'open-cancel'
               ? null
-              : check.mode === 'corrupt'
-                ? '{'
-                : check.source;
+              : check.mode === 'open-error'
+                ? Promise.reject(new Error('Ruta local secreta'))
+                : check.mode === 'corrupt'
+                  ? '{'
+                  : check.source;
           if (command !== 'save_backup') throw new Error('Comando inesperado');
           check.saves++;
-          if (check.mode === 'error') throw new Error('Disco lleno');
+          if (check.mode === 'error' || (check.mode === 'file-error' && !args.previous))
+            throw new Error('Disco lleno');
           if (check.mode === 'cancel') return false;
           if (args.previous) check.previous = args.source;
           else check.source = args.source;
@@ -111,15 +114,40 @@ for (const width of [1100, 768, 360])
 test('CN012 cancelaciones y errores no escriben ni informan éxito', async ({ page }) => {
   await prepare(page);
   const before = await snapshot(page);
+  await mode(page, 'file-error');
+  await exportButton(page).click();
+  await expect(
+    page
+      .getByRole('alert')
+      .getByText(
+        'No se pudo guardar el archivo de respaldo. Revisa los permisos y el espacio disponible.',
+      ),
+  ).toBeVisible();
   await mode(page, 'cancel');
   await exportButton(page).click();
   await expect(page.getByText('Guardado cancelado.', { exact: true })).toBeVisible();
   await mode(page, 'open-cancel');
   await openButton(page).click();
   await expect(page.getByText('Selección cancelada.', { exact: true })).toBeVisible();
+  await mode(page, 'open-error');
+  await openButton(page).click();
+  await expect(
+    page
+      .getByRole('alert')
+      .getByText(
+        'No se pudo leer el archivo seleccionado. Comprueba que el archivo siga disponible y que tengas permiso para abrirlo.',
+      ),
+  ).toBeVisible();
+  await expect(page.getByRole('alert')).not.toContainText('Ruta local secreta');
   await mode(page, 'corrupt');
   await openButton(page).click();
-  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(
+    page
+      .getByRole('alert')
+      .getByText(
+        'El archivo no contiene un JSON válido o está incompleto. La base no fue modificada.',
+      ),
+  ).toBeVisible();
   await mode(page, 'ok');
   await exportButton(page).click();
   await openButton(page).click();
@@ -137,7 +165,13 @@ test('CN012 cancelaciones y errores no escriben ni informan éxito', async ({ pa
   await page.getByLabel('Confirmo reemplazar').check();
   await mode(page, 'error');
   await restoreButton(page).click();
-  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(
+    page
+      .getByRole('alert')
+      .getByText(
+        'No se pudo guardar el respaldo previo. Revisa los permisos y el espacio disponible; la base no fue reemplazada.',
+      ),
+  ).toBeVisible();
   await expect(page.getByRole('region', { name: 'Previsualización del respaldo' })).toBeVisible();
   await expect(page.getByText(/Restauración completada/)).toHaveCount(0);
   expect(await snapshot(page)).toEqual(before);

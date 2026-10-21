@@ -5,6 +5,7 @@ import { useDraftGuard } from '../assignments/useDraftGuard';
 import { openBackup, saveBackup } from '../../lib/tauri/backupFiles';
 import type { BackupPreview } from '../../services/backup/backupService';
 import { TABLE_LABELS, TABLE_NAMES } from '../../services/backup/validation';
+import { backupErrorMessage } from '../../services/backup/errors';
 
 export function BackupRestore({ onRestored }: { onRestored: () => void }) {
   const { backup } = useStorage();
@@ -30,10 +31,8 @@ export function BackupRestore({ onRestored }: { onRestored: () => void }) {
     setError('');
     try {
       await action();
-    } catch {
-      setError(
-        'No se pudo completar la operación. El respaldo puede estar incompleto, ser incompatible o contener datos inválidos. Revisa también los permisos y el espacio disponible. La base no fue reemplazada.',
-      );
+    } catch (cause) {
+      setError(backupErrorMessage(cause));
     } finally {
       locked.current = false;
       setBusy(false);
@@ -58,9 +57,8 @@ export function BackupRestore({ onRestored }: { onRestored: () => void }) {
     >
       <h2 id="backup-title">Respaldo completo y restauración</h2>
       <p>
-        El respaldo contiene todos los registros educativos locales, observaciones privadas y
-        configuración de todos los ciclos y grupos. Permite recuperarlos. El reporte Excel no es un
-        respaldo restaurable.
+        El respaldo contiene todos los registros educativos locales y la configuración de todos los
+        ciclos y grupos. Permite recuperarlos. El reporte Excel no es un respaldo restaurable.
       </p>
       <p>
         Protege estos archivos y tu sesión de Windows. El respaldo no está cifrado. Elige una

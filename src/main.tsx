@@ -4,6 +4,7 @@ import { App } from './app/App';
 import { StorageProvider } from './app/StorageProvider';
 import { WorkContextProvider } from './app/WorkContextProvider';
 import './app/styles.css';
+import './app/notebook.css';
 
 const root = document.getElementById('root');
 

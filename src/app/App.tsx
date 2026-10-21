@@ -1,21 +1,22 @@
-import { Observations } from '../features/notes/Observations';
 import { Reports } from '../features/reports/Reports';
 import { Assignments } from '../features/assignments/Assignments';
-import { Reading } from '../features/reading/Reading';
 import { Students } from '../features/students/Students';
 import { Attendance } from '../features/attendance/Attendance';
 import { useEffect, useRef, useState } from 'react';
 import { Header } from '../components/layout/Header';
 import { Sidebar } from '../components/layout/Sidebar';
+import { PanelDecoration } from '../components/layout/PanelDecoration';
 import { Dashboard } from '../features/dashboard/Dashboard';
 import { ModulePlaceholder } from '../features/ModulePlaceholder';
-import { useNavigation } from './useNavigation';
+import { useLocationHash } from './useNavigation';
+import { resolveSection } from './navigation';
 import { SchoolManagement } from '../features/school-years/SchoolManagement';
 import { useStorage } from './useStorage';
 import { BackupRestore } from '../features/settings/BackupRestore';
 
 export function App() {
-  const current = useNavigation();
+  const hash = useLocationHash();
+  const current = resolveSection(hash || '#/inicio');
   const { state, retry } = useStorage();
   const [settingsRevision, setSettingsRevision] = useState(0);
   const mainRef = useRef<HTMLElement>(null);
@@ -43,7 +44,12 @@ export function App() {
         Saltar al contenido
       </a>
       <Sidebar current={current} />
-      <main id="main-content" ref={mainRef} tabIndex={-1} className="main-content">
+      <main
+        id="main-content"
+        ref={mainRef}
+        tabIndex={-1}
+        className={`main-content${current?.id === 'home' ? ' main-content--home' : ''}`}
+      >
         <Header current={current} />
         {state.status === 'error' ? (
           <section className="panel school-management" role="alert">
@@ -58,11 +64,10 @@ export function App() {
         ) : current?.id === 'attendance' ? (
           <Attendance />
         ) : current?.id === 'assignments' ? (
-          <Assignments />
-        ) : current?.id === 'reading' ? (
-          <Reading />
-        ) : current?.id === 'notes' ? (
-          <Observations />
+          <Assignments
+            key={hash}
+            initialAssignmentId={new URLSearchParams(hash.split('?')[1]).get('tarea')}
+          />
         ) : current?.id === 'settings' ? (
           <>
             <SchoolManagement key={settingsRevision} />
@@ -75,6 +80,9 @@ export function App() {
           <Reports />
         ) : (
           <ModulePlaceholder section={current} />
+        )}
+        {state.status !== 'error' && current && (
+          <PanelDecoration key={current.id} section={current.id} />
         )}
       </main>
     </div>

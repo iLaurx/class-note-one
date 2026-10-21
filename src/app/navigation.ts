@@ -1,9 +1,7 @@
 import {
-  BookOpen,
   CalendarCheck,
   ClipboardList,
   House,
-  MessageSquareText,
   Settings,
   UsersRound,
   ChartNoAxesCombined,
@@ -16,14 +14,6 @@ export const navigation = [
     href: '#/inicio',
     icon: House,
     description: 'Tu día escolar, de un vistazo.',
-  },
-  {
-    id: 'students',
-    label: 'Alumnos',
-    href: '#/alumnos',
-    icon: UsersRound,
-    description: 'Un espacio para conocer y acompañar a cada alumno.',
-    preview: 'Aquí podrás consultar la lista de tu grupo y la ficha de cada alumno.',
   },
   {
     id: 'attendance',
@@ -42,20 +32,12 @@ export const navigation = [
     preview: 'Aquí podrás organizar las tareas y dar seguimiento a las entregas.',
   },
   {
-    id: 'reading',
-    label: 'Lectura en casa',
-    href: '#/lectura',
-    icon: BookOpen,
-    description: 'Pequeñas lecturas, grandes descubrimientos.',
-    preview: 'Aquí podrás consultar las lecturas de cada alumno y sus minutos de lectura.',
-  },
-  {
-    id: 'notes',
-    label: 'Observaciones',
-    href: '#/observaciones',
-    icon: MessageSquareText,
-    description: 'Los detalles también cuentan una historia.',
-    preview: 'Aquí podrás llevar notas sobre el aprendizaje y la participación de tus alumnos.',
+    id: 'students',
+    label: 'Alumnos',
+    href: '#/alumnos',
+    icon: UsersRound,
+    description: 'Un espacio para conocer y acompañar a cada alumno.',
+    preview: 'Aquí podrás consultar la lista de tu grupo y la ficha de cada alumno.',
   },
   {
     id: 'reports',
@@ -78,5 +60,5 @@ export const navigation = [
 export type NavigationItem = (typeof navigation)[number];
 
 export function resolveSection(hash: string): NavigationItem | undefined {
-  return navigation.find((item) => item.href === hash);
+  return navigation.find((item) => item.href === hash.split('?')[0]);
 }

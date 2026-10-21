@@ -74,5 +74,5 @@ export function noteHistory(
     .sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
 }
 export function noteMemberCondition({ enrollment, student }: NoteMember) {
-  return `${enrollment.status === 'inactive' ? 'Matrícula inactiva' : 'Matrícula activa'}${!student.active ? ' · Alumno archivado' : ''} · Ingreso: ${enrollment.joinedAt} · ${enrollment.leftAt ? `Salida: ${enrollment.leftAt}` : 'Sin salida registrada'}`;
+  return `${enrollment.status === 'inactive' ? 'Matrícula inactiva' : 'Matrícula activa'}${!student.active ? ' · Alumno archivado' : ''} · ${enrollment.leftAt ? `Salida: ${enrollment.leftAt}` : 'Sin salida registrada'}`;
 }

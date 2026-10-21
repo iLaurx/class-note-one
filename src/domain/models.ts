@@ -31,7 +31,8 @@ export interface Student extends AuditedEntity {
 export interface Enrollment extends AuditedEntity {
   studentId: string;
   groupId: string;
-  joinedAt: SchoolDate;
+  /** Legacy backup field; no longer used for enrollment or date eligibility. */
+  joinedAt?: SchoolDate;
   leftAt?: SchoolDate;
   status: EnrollmentStatus;
 }

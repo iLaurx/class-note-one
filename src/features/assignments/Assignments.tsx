@@ -4,12 +4,18 @@ import { useWorkContext } from '../../app/useWorkContext';
 import { useStorage } from '../../app/useStorage';
 import { allowNavigation } from '../../app/pendingChanges';
 import type { GroupContext } from '../../db/repositories';
+import { StorageError } from '../../db/errors';
+import { ValidationError } from '../../domain/validation';
 import type { Assignment, SchoolYear } from '../../domain/models';
 import { filterAssignments } from './assignmentDomain';
 import { AssignmentForm } from './AssignmentForm';
 import { AssignmentDetail } from './AssignmentDetail';
 
-export function Assignments() {
+export function Assignments({
+  initialAssignmentId = null,
+}: {
+  initialAssignmentId?: string | null;
+}) {
   const { data } = useWorkContext();
   const year = data?.years.find((item) => item.id === data.selection.schoolYearId);
   const groupId = data?.selection.groupId;
@@ -18,12 +24,25 @@ export function Assignments() {
       {!year || !groupId ? (
         <p>Configura tu grupo en Configuración para gestionar tareas.</p>
       ) : (
-        <AssignmentWorkspace key={`${year.id}:${groupId}`} year={year} groupId={groupId} />
+        <AssignmentWorkspace
+          key={`${year.id}:${groupId}`}
+          year={year}
+          groupId={groupId}
+          initialAssignmentId={initialAssignmentId}
+        />
       )}
     </section>
   );
 }
-function AssignmentWorkspace({ year, groupId }: { year: SchoolYear; groupId: string }) {
+function AssignmentWorkspace({
+  year,
+  groupId,
+  initialAssignmentId,
+}: {
+  year: SchoolYear;
+  groupId: string;
+  initialAssignmentId: string | null;
+}) {
   const { repositories } = useStorage();
   const context: GroupContext = useMemo(
     () => ({ schoolYearId: year.id, groupId }),
@@ -33,6 +52,7 @@ function AssignmentWorkspace({ year, groupId }: { year: SchoolYear; groupId: str
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
+  const [deleted, setDeleted] = useState(false);
   const [query, setQuery] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -40,7 +60,7 @@ function AssignmentWorkspace({ year, groupId }: { year: SchoolYear; groupId: str
     | { type: 'list' }
     | { type: 'form'; assignment: Assignment | null }
     | { type: 'detail'; id: string }
-  >({ type: 'list' });
+  >(initialAssignmentId ? { type: 'detail', id: initialAssignmentId } : { type: 'list' });
   const sequence = useRef(0);
   const [viewVersion, setViewVersion] = useState(0);
   const load = useCallback(async () => {
@@ -76,7 +96,34 @@ function AssignmentWorkspace({ year, groupId }: { year: SchoolYear; groupId: str
       setViewVersion((value) => value + 1);
       setView(next);
       setSaved(false);
+      setDeleted(false);
     }
+  }
+  async function deleteAssignment(assignment: Assignment) {
+    if (!repositories || busy) return;
+    if (
+      !window.confirm(
+        `¿Eliminar la tarea «${assignment.title}» y todas sus entregas y comentarios? Esta acción no se puede deshacer.`,
+      )
+    )
+      return;
+    setBusy(true);
+    setError('');
+    setSaved(false);
+    setDeleted(false);
+    try {
+      await repositories.deleteAssignment(context, assignment.id, assignment, true);
+    } catch (cause) {
+      setError(
+        cause instanceof StorageError || cause instanceof ValidationError
+          ? cause.message
+          : 'No se pudo eliminar la tarea. Reintenta.',
+      );
+      setBusy(false);
+      return;
+    }
+    setDeleted(true);
+    await load();
   }
   const filtered = filterAssignments(rows ?? [], query, from, to);
   const days = new Map<string, Assignment[]>();
@@ -90,6 +137,7 @@ function AssignmentWorkspace({ year, groupId }: { year: SchoolYear; groupId: str
   return (
     <div aria-busy={busy}>
       {saved && <p role="status">La tarea se guardó.</p>}
+      {deleted && <p role="status">La tarea y sus entregas se eliminaron.</p>}
       {busy && <p role="status">Cargando tareas…</p>}
       {error && (
         <>
@@ -145,7 +193,12 @@ function AssignmentWorkspace({ year, groupId }: { year: SchoolYear; groupId: str
           {rows && rows.length > 0 && !filtered.length && <p>Sin coincidencias de tareas.</p>}
           <div className="assignment-days">
             {Array.from(days, ([date, assignments]) => (
-              <section className="assignment-day" key={date} aria-labelledby={`day-${date}`}>
+              <section
+                className="assignment-day"
+                key={date}
+                data-weekday={new Date(`${date}T12:00:00`).getDay()}
+                aria-labelledby={`day-${date}`}
+              >
                 <header className="assignment-day-heading">
                   <div className="assignment-day-date">
                     <span className="day-number" aria-hidden="true">
@@ -162,44 +215,59 @@ function AssignmentWorkspace({ year, groupId }: { year: SchoolYear; groupId: str
                     {assignments.length} {assignments.length === 1 ? 'tarea' : 'tareas'}
                   </span>
                 </header>
-                <ul className="assignment-card-grid">
+                <ul className="assignment-list-view">
                   {assignments.map((assignment) => (
-                    <li className="assignment-card" key={assignment.id}>
-                      <span className="icon-tile">
+                    <li className="assignment-list-row" key={assignment.id}>
+                      <button
+                        className="task-row-open"
+                        disabled={busy}
+                        aria-label={`Abrir entregas de ${assignment.title}`}
+                        onClick={() => navigate({ type: 'detail', id: assignment.id })}
+                      />
+                      <span className="assignment-list-icon">
                         <ClipboardList size={19} aria-hidden="true" />
                       </span>
-                      <h4>{assignment.title}</h4>
-                      {assignment.description && (
-                        <p className="assignment-card-description">{assignment.description}</p>
-                      )}
-                      <p className="assignment-card-due">
-                        {assignment.dueDate ? (
-                          <>
-                            Entrega:{' '}
-                            <time dateTime={assignment.dueDate}>
-                              {dateLabel(assignment.dueDate, {
-                                day: 'numeric',
-                                month: 'short',
-                                year: 'numeric',
-                              })}
-                            </time>
-                          </>
-                        ) : (
-                          'Sin fecha de entrega'
-                        )}
-                      </p>
-                      <div className="assignment-card-actions">
+                      <div className="assignment-list-info">
+                        <h4>{assignment.title}</h4>
+                        {assignment.description && <p>{assignment.description}</p>}
+                        <span className="assignment-list-due">
+                          {assignment.dueDate ? (
+                            <>
+                              Entrega:{' '}
+                              <time dateTime={assignment.dueDate}>
+                                {dateLabel(assignment.dueDate, {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric',
+                                })}
+                              </time>
+                            </>
+                          ) : (
+                            'Sin fecha de entrega'
+                          )}
+                        </span>
+                      </div>
+                      <div className="assignment-list-actions">
                         <button
+                          disabled={busy}
                           aria-label={`Ver entregas de ${assignment.title}`}
                           onClick={() => navigate({ type: 'detail', id: assignment.id })}
                         >
                           Ver entregas
                         </button>
                         <button
+                          disabled={busy}
                           aria-label={`Editar tarea ${assignment.title}`}
                           onClick={() => navigate({ type: 'form', assignment })}
                         >
                           Editar
+                        </button>
+                        <button
+                          disabled={busy}
+                          aria-label={`Eliminar tarea ${assignment.title}`}
+                          onClick={() => void deleteAssignment(assignment)}
+                        >
+                          Eliminar
                         </button>
                       </div>
                     </li>

@@ -4,18 +4,18 @@ async function navigate(page: Page, label: string) {
   const nav = page.getByRole('navigation');
   if (['Lectura en casa', 'Observaciones', 'Reportes', 'Configuración'].includes(label)) {
     const menu = nav.locator('details');
-    if (!(await menu.getAttribute('open')) && (await menu.getAttribute('open')) !== '')
+    if ((await menu.count()) && (await menu.getAttribute('open')) === null)
       await menu.locator('summary').click();
   }
   await nav.getByRole('link', { name: label, exact: true }).click();
 }
-async function configure(page: Page) {
+async function configure(page: Page, startDate = '2026-08-01') {
   await page.clock.setFixedTime(new Date(2026, 9, 20, 12));
   await page.goto('/');
   await page.getByRole('link', { name: 'Configurar mi grupo' }).first().click();
   await page.getByRole('button', { name: 'Crear ciclo escolar', exact: true }).click();
   await page.getByLabel('Etiqueta', { exact: true }).fill('2026–2027');
-  await page.getByLabel('Fecha de inicio').fill('2026-08-01');
+  await page.getByLabel('Fecha de inicio').fill(startDate);
   await page.getByLabel('Fecha de fin').fill('2027-07-31');
   await page.getByRole('button', { name: 'Guardar ciclo', exact: true }).click();
   await expect(page.getByRole('form')).toHaveCount(0);
@@ -50,6 +50,12 @@ for (const width of [1280, 768, 360]) {
       const cardsBox = await directory.boundingBox();
       const formBox = await registration.boundingBox();
       expect(formBox!.x).toBeGreaterThan(cardsBox!.x + cardsBox!.width);
+      const lastStudent = await directory.locator('.student-card').last().boundingBox();
+      expect(lastStudent!.y + lastStudent!.height).toBeLessThan(760);
+    }
+    if (width >= 1000) {
+      const header = await page.locator('.sidebar').boundingBox();
+      expect(header!.height).toBeLessThanOrEqual(72);
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
@@ -67,6 +73,10 @@ for (const width of [1280, 768, 360]) {
     await expect(page.getByRole('link', { name: 'Alumnos del grupo', exact: true })).toContainText(
       '7',
     );
+    if (width > 760) {
+      const agenda = await page.locator('.agenda-panel').boundingBox();
+      expect(agenda!.y + agenda!.height).toBeLessThan(760);
+    }
     await page.screenshot({ path: `test-results/redesign-home-${width}.png`, fullPage: true });
     await context.setOffline(true);
     await page.getByRole('link', { name: 'Pasar lista' }).click();
@@ -160,7 +170,7 @@ for (const width of [1280, 768, 360]) {
         .getByRole('button', { name: 'Falta', exact: true }),
     ).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByLabel(/Nota de/).first()).toHaveValue('Avisó su familia');
-    for (const label of ['Lectura en casa', 'Observaciones', 'Reportes', 'Configuración']) {
+    for (const label of ['Reportes', 'Configuración']) {
       await navigate(page, label);
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(label);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
@@ -200,50 +210,29 @@ test('menú con teclado, foco y navegación directa sin datos inventados', async
   await expect(page.getByRole('link', { name: 'Saltar al contenido' })).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('main')).toBeFocused();
-  await page.getByRole('navigation').locator('summary').focus();
-  await page.keyboard.press('Enter');
   await page.getByRole('navigation').getByRole('link', { name: 'Reportes' }).focus();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Reportes');
   await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
   await page.goto('/#/lectura');
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Lectura en casa');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sección no encontrada');
   await expect(page.getByRole('button', { name: 'Registrar lectura', exact: true })).toHaveCount(0);
 });
 
-test('lectura y observación: registrar, filtrar y recuperar al abrir', async ({ page }) => {
+test('lecturas y observaciones permanecen ocultas en toda la interfaz', async ({ page }) => {
   await configure(page);
-  await navigate(page, 'Lectura en casa');
-  await page.getByRole('button', { name: 'Registrar lectura', exact: true }).click();
-  await expect(page.getByLabel('Fecha de lectura')).toHaveValue('2026-10-20');
-  await page
-    .getByRole('combobox', { name: 'Alumno', exact: true })
-    .selectOption({ label: 'Prueba, Ana' });
-  await page.getByLabel('Título o texto leído').fill('El cuento del día');
-  await page.getByLabel('Minutos', { exact: true }).fill('12');
-  await page.getByRole('button', { name: 'Guardar lectura', exact: true }).click();
-  await expect(page.getByText('Total del grupo: 12 minutos · 1 registros')).toBeVisible();
-  await page.getByText('Ver lecturas por alumno', { exact: true }).click();
-  await page
-    .getByRole('combobox', { name: 'Alumno', exact: true })
-    .selectOption({ label: 'Prueba, Ana' });
-  await expect(page.getByText('El cuento del día', { exact: true })).toBeVisible();
-  await navigate(page, 'Observaciones');
-  await page.getByRole('button', { name: 'Registrar observación', exact: true }).click();
-  await expect(page.getByLabel('Fecha de observación')).toHaveValue('2026-10-20');
-  await page
-    .getByRole('combobox', { name: 'Alumno', exact: true })
-    .selectOption({ label: 'Prueba, Ana' });
-  await page.getByLabel('Texto de la observación').fill('Participó en la lectura de hoy.');
-  await page.getByRole('button', { name: 'Guardar observación', exact: true }).click();
-  await expect(page.getByText('Participó en la lectura de hoy.', { exact: true })).toBeVisible();
-  await page.getByText('Buscar y filtrar', { exact: true }).click();
-  await page.getByLabel('Buscar por nombre o texto').fill('no coincide');
-  await expect(page.getByText('Participó en la lectura de hoy.', { exact: true })).toHaveCount(0);
-  await page.getByLabel('Buscar por nombre o texto').fill('lectura');
-  await expect(page.getByText('Participó en la lectura de hoy.', { exact: true })).toBeVisible();
-  await page.reload();
-  await expect(page.getByText('Participó en la lectura de hoy.', { exact: true })).toBeVisible();
+  for (const label of ['Inicio', 'Alumnos', 'Asistencia', 'Tareas', 'Reportes', 'Configuración']) {
+    await navigate(page, label);
+    await expect(page.getByText(/lecturas|lectura en casa|observaciones/i)).toHaveCount(0);
+    await expect(page.locator('a[href="#/lectura"], a[href="#/observaciones"]')).toHaveCount(0);
+  }
+  for (const hash of ['lectura', 'observaciones']) {
+    await page.goto('/#/' + hash);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sección no encontrada');
+    await expect(
+      page.getByRole('heading', { name: 'Esta sección no está disponible' }),
+    ).toBeVisible();
+  }
 });
 
 test('permite recuperar un error de almacenamiento desde cualquier sección', async ({ page }) => {
@@ -301,6 +290,7 @@ test('fechas de hoy editables aunque el ciclo todavía no empiece; edición cons
   await expect(page.getByLabel('Fecha de asignación')).toHaveValue('2026-10-27');
   await page.getByRole('button', { name: 'Guardar tarea', exact: true }).click();
   await navigate(page, 'Reportes');
+  await page.getByRole('button', { name: 'Fechas libres', exact: true }).click();
   await expect(page.getByLabel('Desde', { exact: true })).toHaveValue('2026-10-21');
   await expect(page.getByLabel('Hasta', { exact: true })).toHaveValue('2026-10-21');
   await page.getByLabel('Desde', { exact: true }).fill('2026-10-27');
@@ -308,7 +298,7 @@ test('fechas de hoy editables aunque el ciclo todavía no empiece; edición cons
   await expect(page.getByLabel('Desde', { exact: true })).toHaveValue('2026-10-27');
 });
 
-test('inicio cuenta todo el grupo aunque haya ingresos futuros', async ({ page }) => {
+test('los ingresos antiguos no excluyen alumnos de la asistencia', async ({ page }) => {
   await configure(page);
   await page.evaluate(async () => {
     const request = indexedDB.open('classnote');
@@ -331,9 +321,35 @@ test('inicio cuenta todo el grupo aunque haya ingresos futuros', async ({ page }
   await expect(page.getByRole('link', { name: 'Alumnos del grupo', exact: true })).toContainText(
     '7',
   );
-  await expect(page.getByRole('link', { name: 'Asistencia de hoy' })).toContainText(
-    '3 alumnos para esta fecha',
-  );
+  await expect(page.getByRole('link', { name: 'Asistencia de hoy' })).toContainText('/ 7');
+  await navigate(page, 'Asistencia');
+  await expect(page.getByRole('group', { name: /Estado de/ })).toHaveCount(7);
+  await page.getByRole('button', { name: 'Marcar todos presentes', exact: true }).click();
+  await page.getByRole('button', { name: 'Guardar asistencia', exact: true }).click();
+  await expect(page.getByText('Asistencia guardada. 0 sin registrar.')).toBeVisible();
   await navigate(page, 'Alumnos');
   await expect(page.locator('.student-card')).toHaveCount(7);
+});
+
+test('editar el inicio del 26 al 20 permite guardar asistencia y conservarla al recargar', async ({
+  page,
+}) => {
+  await configure(page, '2026-10-26');
+  await navigate(page, 'Configuración');
+  await page.getByRole('button', { name: 'Editar ciclo', exact: true }).click();
+  await page.getByLabel('Fecha de inicio').fill('2026-10-20');
+  await page.getByRole('button', { name: 'Guardar ciclo', exact: true }).click();
+  await expect(page.getByRole('form')).toHaveCount(0);
+  await navigate(page, 'Asistencia');
+  await expect(page.getByLabel('Fecha de asistencia')).toHaveAttribute('min', '2026-10-20');
+  await expect(page.getByRole('group', { name: /Estado de/ })).toHaveCount(7);
+  await page.getByRole('button', { name: 'Marcar todos presentes', exact: true }).click();
+  await page.getByRole('button', { name: 'Guardar asistencia', exact: true }).click();
+  await expect(page.getByText('Asistencia guardada. 0 sin registrar.')).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('group', { name: /Estado de/ })).toHaveCount(7);
+  await expect(page.getByRole('button', { name: 'Presente', exact: true }).first()).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
 });

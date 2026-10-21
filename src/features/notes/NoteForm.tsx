@@ -114,7 +114,7 @@ export function NoteForm({
         <input
           type="date"
           required
-          min={member?.enrollment.joinedAt ?? year.startDate}
+          min={year.startDate}
           max={member?.enrollment.leftAt ?? year.endDate}
           disabled={busy}
           value={fields.date}

@@ -130,5 +130,5 @@ export function weeklyReadings(
   };
 }
 export function memberCondition({ enrollment, student }: ReadingMember) {
-  return `${enrollment.status === 'inactive' ? 'Matrícula inactiva' : 'Matrícula activa'}${!student.active ? ' · Alumno archivado' : ''} · Ingreso: ${enrollment.joinedAt} · ${enrollment.leftAt ? `Salida: ${enrollment.leftAt}` : 'Sin salida registrada'}`;
+  return `${enrollment.status === 'inactive' ? 'Matrícula inactiva' : 'Matrícula activa'}${!student.active ? ' · Alumno archivado' : ''} · ${enrollment.leftAt ? `Salida: ${enrollment.leftAt}` : 'Sin salida registrada'}`;
 }

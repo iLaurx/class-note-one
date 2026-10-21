@@ -1,6 +1,7 @@
 import { ClassNoteDatabase } from '../../db/database.ts';
 import { requireRule } from '../../domain/validation.ts';
 import { parseBackup, TABLE_NAMES, validateRows, type BackupRows } from './validation.ts';
+import { asBackupError } from './errors.ts';
 
 // Lazy import keeps the addon and file readers out of ordinary application startup.
 const addon = () => import('dexie-export-import');
@@ -10,6 +11,20 @@ function stable(value: unknown): string {
     item && typeof item === 'object' && !Array.isArray(item)
       ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)))
       : item,
+  );
+}
+function stableRows(rows: BackupRows): string {
+  return JSON.stringify(
+    Object.fromEntries(
+      TABLE_NAMES.map((name) => [
+        name,
+        [...rows[name]].sort((a, b) => String(a.id ?? a.key).localeCompare(String(b.id ?? b.key))),
+      ]),
+    ),
+    (_, item: unknown) =>
+      item && typeof item === 'object' && !Array.isArray(item)
+        ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)))
+        : item,
   );
 }
 async function snapshot(db: ClassNoteDatabase): Promise<BackupRows> {
@@ -57,25 +72,43 @@ export class BackupService {
   private async validate(source: string) {
     const parsed = parseBackup(source);
     const temporary = new ClassNoteDatabase(`classnote-restore-validation-${crypto.randomUUID()}`);
+    let imported: BackupRows;
     try {
-      await temporary.open();
-      const { importInto } = await addon();
-      await importInto(temporary, new Blob([JSON.stringify(parsed.payload)]), {
-        acceptNameDiff: true,
-      });
-      const imported = await temporary.transaction('r', temporary.tables, () =>
-        snapshot(temporary),
-      );
-      requireRule(
-        stable(imported) === stable(parsed.rows),
-        'El respaldo no conserva todos sus registros.',
-      );
-      validateRows(imported);
-      return parsed;
-    } finally {
+      try {
+        await temporary.open();
+        const { importInto } = await addon();
+        await importInto(temporary, new Blob([JSON.stringify(parsed.payload)]), {
+          acceptNameDiff: true,
+        });
+        imported = await temporary.transaction('r', temporary.tables, () => snapshot(temporary));
+      } catch (cause) {
+        throw asBackupError('temporary-import', cause);
+      }
+      if (stableRows(imported) !== stableRows(parsed.rows))
+        throw asBackupError(
+          'invalid-data',
+          new Error('La importación no conservó todos los registros.'),
+        );
+      try {
+        validateRows(imported);
+      } catch (cause) {
+        throw asBackupError('invalid-data', cause);
+      }
+    } catch (cause) {
       // Only this isolated, newly created staging database is ever deleted.
-      await temporary.delete();
+      try {
+        await temporary.delete();
+      } catch (cleanupCause) {
+        throw asBackupError('temporary-import', cleanupCause);
+      }
+      throw cause;
     }
+    try {
+      await temporary.delete();
+    } catch (cause) {
+      throw asBackupError('temporary-import', cause);
+    }
+    return { ...parsed, rows: imported };
   }
 
   async restore(
@@ -85,18 +118,31 @@ export class BackupService {
   ): Promise<boolean> {
     if (!confirmed) return false;
     const validated = await this.validate(source);
-    const previous = await this.capture();
-    if (!(await savePrevious(previous.source))) return false;
-    await this.db.transaction('rw', this.db.tables, async () => {
-      requireRule(
-        stable(await snapshot(this.db)) === stable(previous.rows),
-        'Los datos cambiaron mientras guardabas el respaldo previo. Revisa y vuelve a confirmar la restauración.',
-      );
-      for (const name of TABLE_NAMES) {
-        await this.db.table(name).clear();
-        await this.db.table(name).bulkAdd(validated.rows[name]);
-      }
-    });
+    let previous: Awaited<ReturnType<BackupService['capture']>>;
+    try {
+      previous = await this.capture();
+    } catch (cause) {
+      throw asBackupError('previous-export', cause);
+    }
+    try {
+      if (!(await savePrevious(previous.source))) return false;
+    } catch (cause) {
+      throw asBackupError('previous-save', cause);
+    }
+    try {
+      await this.db.transaction('rw', this.db.tables, async () => {
+        requireRule(
+          stable(await snapshot(this.db)) === stable(previous.rows),
+          'Los datos cambiaron mientras guardabas el respaldo previo. Revisa y vuelve a confirmar la restauración.',
+        );
+        for (const name of TABLE_NAMES) {
+          await this.db.table(name).clear();
+          await this.db.table(name).bulkAdd(validated.rows[name]);
+        }
+      });
+    } catch (cause) {
+      throw asBackupError('active-write', cause);
+    }
     return true;
   }
 }

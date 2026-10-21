@@ -178,7 +178,7 @@ function StudentGroup({ year, group }: { year: SchoolYear; group: Group }) {
                     </strong>
                     <span>
                       {g?.shift || 'Sin turno'} · {e.status === 'active' ? 'Activa' : 'Inactiva'} ·
-                      Ingreso: {e.joinedAt} · Salida: {e.leftAt || 'Sin fecha'}
+                      Salida: {e.leftAt || 'Sin fecha'}
                     </span>
                     {(g?.archived || y?.archived) && <span>Grupo o ciclo archivado</span>}
                     {e.groupId === group.id && (

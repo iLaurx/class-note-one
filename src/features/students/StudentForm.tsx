@@ -20,7 +20,6 @@ export function StudentForm({
   const student = 'student' in form ? form.student : undefined;
   const [firstName, setFirst] = useState(student?.firstName ?? '');
   const [lastName, setLast] = useState(student?.lastName ?? '');
-  const joinedAt = enrollment?.joinedAt ?? year.startDate;
   const [leftAt, setLeft] = useState(enrollment?.leftAt ?? '');
   const titles = {
     new: 'Nuevo alumno',
@@ -37,7 +36,7 @@ export function StudentForm({
       await state.run(async (r) => {
         switch (form.kind) {
           case 'new':
-            return r.createStudentWithEnrollment(context, { firstName, lastName, joinedAt });
+            return r.createStudentWithEnrollment(context, { firstName, lastName });
           case 'edit':
             return r.updateStudent(form.student.id, { firstName, lastName });
           case 'archive':
@@ -46,7 +45,6 @@ export function StudentForm({
             return r.updateEnrollment(
               { ...context, enrollmentId: form.enrollment.id },
               {
-                joinedAt,
                 leftAt: leftAt || undefined,
                 status:
                   form.kind === 'leave'
@@ -94,7 +92,7 @@ export function StudentForm({
                 Fecha de salida (opcional)
                 <input
                   type="date"
-                  min={joinedAt}
+                  min={year.startDate}
                   max={year.endDate}
                   value={leftAt}
                   onChange={(e) => setLeft(e.target.value)}

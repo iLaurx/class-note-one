@@ -5,6 +5,7 @@ import { ClassNoteDatabase } from '../../src/db/database.ts';
 import { Repositories } from '../../src/db/repositories.ts';
 import { BackupService } from '../../src/services/backup/backupService.ts';
 import { createFixture, fillRelated } from './fixtures.ts';
+import { BackupOperationError } from '../../src/services/backup/errors.ts';
 
 // Browser FileReader contract needed by the addon; no product fallback or test hook.
 Object.assign(globalThis, {
@@ -125,9 +126,72 @@ test('CN012 rechazo de corrupción, truncado, versiones, campos, conteos, refere
       service.restore(JSON.stringify(value), true, async () => {
         throw new Error('No debe pedir guardado');
       }),
+      (error: unknown) =>
+        (error instanceof BackupOperationError && error.code === 'incompatible') ||
+        (error instanceof BackupOperationError && error.code === 'invalid-data'),
     );
     assert.deepEqual(await snapshot(db), before);
   }
+});
+
+test('CN012 distingue JSON inválido, versión incompatible y datos inválidos conservando la base', async (t) => {
+  const { db, r, service } = setup();
+  t.after(() => db.delete());
+  await fillRelated(r);
+  const source = await service.export();
+  const before = await snapshot(db);
+  const wrongVersion = JSON.parse(source);
+  wrongVersion.formatVersion = 999;
+  const badRelation = JSON.parse(source);
+  badRelation.data.data.data.find(
+    (chunk: { tableName: string }) => chunk.tableName === 'enrollments',
+  ).rows[0].studentId = crypto.randomUUID();
+  for (const [invalid, code] of [
+    ['{', 'invalid-json'],
+    [JSON.stringify(wrongVersion), 'incompatible'],
+    [JSON.stringify(badRelation), 'invalid-data'],
+  ] as const) {
+    await assert.rejects(
+      service.restore(invalid, true, async () => assert.fail('No debe guardar')),
+      (error: unknown) => error instanceof BackupOperationError && error.code === code,
+    );
+    assert.deepEqual(await snapshot(db), before);
+  }
+});
+
+test('CN012 importa en temporal aunque el JSON enumere filas en orden distinto', async (t) => {
+  const { db, r, service } = setup();
+  t.after(() => db.delete());
+  await fillRelated(r);
+  const envelope = JSON.parse(await service.export());
+  for (const chunk of envelope.data.data.data) chunk.rows.reverse();
+  const reordered = JSON.stringify(envelope);
+  const info = await service.preview(reordered);
+  const expectedStudents = envelope.data.data.tables.find(
+    (table: { name: string }) => table.name === 'students',
+  ).rowCount;
+  assert.equal(info.counts.students, expectedStudents);
+  assert.equal(await service.restore(reordered, true, async () => true), true);
+  assert.equal(await db.students.count(), expectedStudents);
+});
+
+test('CN012 distingue un fallo del importador temporal y conserva la base activa', async (t) => {
+  const { db, r, service } = setup();
+  t.after(() => db.delete());
+  await fillRelated(r);
+  const envelope = JSON.parse(await service.export());
+  const years = envelope.data.data.data.find(
+    (chunk: { tableName: string }) => chunk.tableName === 'schoolYears',
+  ).rows;
+  years.push({ ...years[0], id: crypto.randomUUID() });
+  envelope.data.data.tables.find((table: { name: string }) => table.name === 'schoolYears')
+    .rowCount++;
+  const before = await snapshot(db);
+  await assert.rejects(
+    service.preview(JSON.stringify(envelope)),
+    (error: unknown) => error instanceof BackupOperationError && error.code === 'temporary-import',
+  );
+  assert.deepEqual(await snapshot(db), before);
 });
 
 test('CN012 cancelaciones, fallo de respaldo previo y conflicto mientras se guarda conservan la base', async (t) => {
@@ -147,6 +211,7 @@ test('CN012 cancelaciones, fallo de respaldo previo y conflicto mientras se guar
     service.restore(source, true, async () => {
       throw new Error('Disco lleno');
     }),
+    (error: unknown) => error instanceof BackupOperationError && error.code === 'previous-save',
   );
   assert.deepEqual(await snapshot(db), before);
   await assert.rejects(
@@ -154,9 +219,34 @@ test('CN012 cancelaciones, fallo de respaldo previo y conflicto mientras se guar
       await r.createSetting({ key: 'concurrent', value: true });
       return true;
     }),
-    /cambiaron/,
+    (error: unknown) =>
+      error instanceof BackupOperationError &&
+      error.code === 'active-write' &&
+      error.cause instanceof Error &&
+      error.cause.message.includes('cambiaron'),
   );
   assert.equal((await r.getSetting('concurrent'))?.value, true);
+});
+
+test('CN012 clasifica el fallo al preparar el respaldo previo y conserva su causa interna', async (t) => {
+  const { db, r, service } = setup();
+  t.after(() => db.delete());
+  await fillRelated(r);
+  const source = await service.export();
+  const before = await snapshot(db);
+  const internals = service as unknown as { capture: () => Promise<never> };
+  internals.capture = async () => {
+    throw new Error('Fallo local con detalle privado');
+  };
+  await assert.rejects(
+    service.restore(source, true, async () => true),
+    (error: unknown) =>
+      error instanceof BackupOperationError &&
+      error.code === 'previous-export' &&
+      error.cause instanceof Error &&
+      error.cause.message === 'Fallo local con detalle privado',
+  );
+  assert.deepEqual(await snapshot(db), before);
 });
 
 test('CN012 fallo real a mitad de transacción revierte limpieza, inserciones y selección; unicidad en temporal', async (t) => {
@@ -173,7 +263,7 @@ test('CN012 fallo real a mitad de transacción revierte limpieza, inserciones y 
   db.submissions.hook('creating', fail);
   await assert.rejects(
     service.restore(source, true, async () => true),
-    /Fallo sintético/,
+    (error: unknown) => error instanceof BackupOperationError && error.code === 'active-write',
   );
   db.submissions.hook('creating').unsubscribe(fail);
   assert.deepEqual(await snapshot(db), before);

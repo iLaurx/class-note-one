@@ -147,15 +147,6 @@ function DashboardSummary({ context, today }: { context: GroupContext; today: st
                 : 'Fuera del ciclo'}
           </small>
         </a>
-        <a href="#/lectura" className="stat-card panel" aria-label="Lecturas de la semana">
-          <BookOpen size={20} aria-hidden="true" />
-          <strong className="stat-number">
-            {data.reading.minutes}
-            <span className="stat-denominator"> min</span>
-          </strong>
-          <span>Lectura esta semana</span>
-          <small>{data.reading.count} registros</small>
-        </a>
       </div>
       <section className="panel agenda-panel" aria-labelledby="agenda-title">
         <div className="section-heading">
@@ -177,6 +168,11 @@ function DashboardSummary({ context, today }: { context: GroupContext; today: st
           <ul className="assignment-list">
             {data.assignments.slice(0, 5).map((row) => (
               <li key={row.id}>
+                <a
+                  className="task-row-open"
+                  href={`#/tareas?tarea=${encodeURIComponent(row.id)}`}
+                  aria-label={`Abrir entregas de ${row.title}`}
+                />
                 <span className="icon-tile">
                   <ClipboardList size={18} aria-hidden="true" />
                 </span>

@@ -271,9 +271,8 @@ export class Repositories {
       const enrollments = await this.db.enrollments.where('groupId').anyOf(groups).toArray();
       for (const enrollment of enrollments) {
         requireRule(
-          enrollment.joinedAt >= startDate &&
-            (!endDate || enrollment.joinedAt <= endDate) &&
-            (enrollment.leftAt === undefined || !endDate || enrollment.leftAt <= endDate),
+          enrollment.leftAt === undefined ||
+            (enrollment.leftAt >= startDate && (!endDate || enrollment.leftAt <= endDate)),
           'El intervalo dejaría matrículas fuera del ciclo. Conserva sus fechas.',
         );
       }
@@ -462,20 +461,16 @@ export class Repositories {
       );
       const student = await this.db.students.get(studentId);
       requireRule(student?.active, 'El alumno debe estar activo para matricular.');
-      const joinedAt = schoolDate(data.joinedAt);
       const leftAt = data.leftAt === undefined ? undefined : schoolDate(data.leftAt);
       requireRule(
-        joinedAt >= year.startDate &&
-          (!year.endDate || joinedAt <= year.endDate) &&
-          (leftAt === undefined ||
-            (leftAt >= joinedAt && (!year.endDate || leftAt <= year.endDate))),
+        leftAt === undefined ||
+          (leftAt >= year.startDate && (!year.endDate || leftAt <= year.endDate)),
         'Las fechas de matrícula deben estar ordenadas y dentro del ciclo.',
       );
       const value = {
         ...audit(),
         studentId,
         groupId: group.id,
-        joinedAt,
         leftAt,
         status: choice(data.status, ['active', 'inactive'] as const, 'Estado de matrícula'),
       };
@@ -500,7 +495,6 @@ export class Repositories {
       });
       const enrollment = await this.createEnrollment(context, {
         studentId: student.id,
-        joinedAt: data.joinedAt,
         status: 'active',
       });
       return { student, enrollment };
@@ -560,13 +554,10 @@ export class Repositories {
           'Reactiva alumno, ciclo y grupo antes de activar la matrícula.',
         );
       }
-      const joinedAt = schoolDate(data.joinedAt);
       const leftAt = data.leftAt === undefined ? undefined : schoolDate(data.leftAt);
       requireRule(
-        joinedAt >= year.startDate &&
-          (!year.endDate || joinedAt <= year.endDate) &&
-          (leftAt === undefined ||
-            (leftAt >= joinedAt && (!year.endDate || leftAt <= year.endDate))),
+        leftAt === undefined ||
+          (leftAt >= year.startDate && (!year.endDate || leftAt <= year.endDate)),
         'Las fechas de matrícula deben estar ordenadas y dentro del ciclo.',
       );
       const attendance = await this.db.attendance
@@ -574,14 +565,11 @@ export class Repositories {
         .equals(enrollment.id)
         .toArray();
       requireRule(
-        attendance.every(
-          (item) => item.date >= joinedAt && (leftAt === undefined || item.date <= leftAt),
-        ),
+        attendance.every((item) => leftAt === undefined || item.date <= leftAt),
         'El intervalo dejaría asistencias fuera de la matrícula. Conserva sus fechas.',
       );
       const value = {
         ...enrollment,
-        joinedAt,
         leftAt,
         status,
         updatedAt: new Date().toISOString(),
@@ -623,7 +611,6 @@ export class Repositories {
       requireRule(
         date >= year.startDate &&
           (!year.endDate || date <= year.endDate) &&
-          date >= enrollment.joinedAt &&
           (enrollment.leftAt === undefined || date <= enrollment.leftAt),
         'La asistencia debe estar dentro del ciclo y del intervalo de matrícula, incluidos sus extremos.',
       );
@@ -805,6 +792,25 @@ export class Repositories {
       const value = { ...previous, ...fields, updatedAt: new Date().toISOString() };
       await this.db.assignments.put(value);
       return value;
+    });
+  }
+
+  deleteAssignment(
+    context: GroupContext,
+    assignmentId: string,
+    expected: unknown,
+    confirmed: boolean,
+  ) {
+    return this.write(async () => {
+      requireRule(confirmed === true, 'Confirma la eliminación de la tarea.');
+      const previous = await this.assignment(context, assignmentId);
+      const snapshot = record(expected);
+      requireRule(
+        Object.entries(previous).every(([key, value]) => snapshot[key] === value),
+        'La tarea cambió en otra ventana. Actualiza el listado antes de eliminar.',
+      );
+      await this.db.submissions.where('assignmentId').equals(previous.id).delete();
+      await this.db.assignments.delete(previous.id);
     });
   }
 
