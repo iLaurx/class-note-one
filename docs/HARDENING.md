@@ -1,5 +1,7 @@
 # CN-013 — Matriz Windows y recuperación
 
+> Documento histórico de desarrollo. Conserva el alcance, las pruebas y los pendientes de su etapa, incluidos módulos o pantallas anteriores. Para ClassNote 1.1.0 consulta el [README actual](../README.md), la [guía breve](QUICK_START.md) y las [notas vigentes](RELEASE_1.1.0.md). Los resultados de esta etapa no acreditan el nuevo instalador.
+
 Ejecución del 20/10/2026 sobre `main`, inicialmente limpio. Windows x64, build
 26300, ClassNote 0.1.0 / Dexie v1. Solo datos sintéticos y perfiles creados dentro
 de `test-results/native/`. No se modificaron red, firewall, perfiles personales,

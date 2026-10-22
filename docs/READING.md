@@ -1,5 +1,7 @@
 # CN-008 — Lecturas en casa
 
+> Documento histórico de desarrollo. Conserva el alcance, las pruebas y los pendientes de su etapa, incluidos módulos o pantallas anteriores. Para ClassNote 1.1.0 consulta el [README actual](../README.md), la [guía breve](QUICK_START.md) y las [notas vigentes](RELEASE_1.1.0.md). Los resultados de esta etapa no acreditan el nuevo instalador.
+
 Alcance: alta y edición de lecturas por matrícula, historial individual y resumen semanal del grupo seleccionado. Sin eliminación, promedios, metas, rachas, Excel, respaldos, dashboard ni observaciones. Se conservan Dexie v1, sus diez tablas, índices, identifier, origen, perfil WebView2, permisos y dependencias.
 
 ## Reglas y consulta

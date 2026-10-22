@@ -1,5 +1,7 @@
 # CN-009 — Observaciones privadas por alumno
 
+> Documento histórico de desarrollo. Conserva el alcance, las pruebas y los pendientes de su etapa, incluidos módulos o pantallas anteriores. Para ClassNote 1.1.0 consulta el [README actual](../README.md), la [guía breve](QUICK_START.md) y las [notas vigentes](RELEASE_1.1.0.md). Los resultados de esta etapa no acreditan el nuevo instalador.
+
 Alcance exclusivo: alta, consulta, edición y eliminación individual de notas por matrícula. Dexie v1 conserva diez tablas e índices, identifier, origen, perfil y permisos. Sin dependencias nuevas, contactos, adjuntos, categorías adicionales, métricas ni conexión al dashboard/resumen/reportes. Los datos sintéticos de pruebas nunca se cargan al arrancar el producto.
 
 ## Uso y reglas

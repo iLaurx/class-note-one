@@ -1,5 +1,7 @@
 # CN-010 — Resumen docente del grupo
 
+> Documento histórico de desarrollo. Conserva el alcance, las pruebas y los pendientes de su etapa, incluidos módulos o pantallas anteriores. Para ClassNote 1.1.0 consulta el [README actual](../README.md), la [guía breve](QUICK_START.md) y las [notas vigentes](RELEASE_1.1.0.md). Los resultados de esta etapa no acreditan el nuevo instalador.
+
 Inicio consulta datos reales del ciclo y grupo elegidos en el contexto persistente.
 Sin ambos IDs no consulta un resumen ni elige grupo; indica que hay que seleccionarlo.
 Se retiraron dashboard.mock.ts, el aviso de demostración y los datos ficticios de

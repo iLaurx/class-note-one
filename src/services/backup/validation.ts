@@ -9,6 +9,7 @@ import {
   uuid,
 } from '../../domain/validation.ts';
 import { BackupOperationError } from './errors.ts';
+import { SUPPORTED_BACKUP_VERSIONS } from './version.ts';
 
 export const TABLE_NAMES = Object.keys(SCHEMA_V1) as (keyof typeof SCHEMA_V1)[];
 export type TableName = (typeof TABLE_NAMES)[number];
@@ -186,7 +187,7 @@ function parseBackupInternal(source: string) {
     envelope.format === 'classnote-backup' &&
     envelope.formatVersion === 1 &&
     envelope.schemaVersion === 1 &&
-    envelope.appVersion === '0.1.0'
+    SUPPORTED_BACKUP_VERSIONS.some((version) => envelope.appVersion === version)
   ) {
     // Continue parsing the supported envelope.
   } else {
@@ -265,7 +266,7 @@ function parseBackupInternal(source: string) {
   }
   return {
     createdAt,
-    appVersion: '0.1.0',
+    appVersion: envelope.appVersion as (typeof SUPPORTED_BACKUP_VERSIONS)[number],
     schemaVersion: 1,
     formatVersion: 1,
     counts,

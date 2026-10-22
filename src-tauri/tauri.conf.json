@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "ClassNote",
-  "version": "0.1.0",
+  "version": "1.1.0",
   "identifier": "org.classnote.desktop",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -36,13 +36,14 @@
       "../LICENSE": "LICENSE",
       "../docs/INSTALLATION.md": "docs/INSTALLATION.md",
       "../docs/PRIVACY.md": "docs/PRIVACY.md",
-      "../docs/RELEASE_0.1.0.md": "docs/RELEASE_0.1.0.md"
+      "../docs/QUICK_START.md": "docs/QUICK_START.md",
+      "../docs/RELEASE_1.1.0.md": "docs/RELEASE_1.1.0.md"
     },
     "targets": ["nsis"],
     "icon": ["icons/icon.ico", "icons/icon.png"],
     "shortDescription": "Agenda escolar sin conexión",
     "windows": {
-      "webviewInstallMode": { "type": "skip" },
+      "webviewInstallMode": { "type": "offlineInstaller", "silent": true },
       "nsis": {
         "languages": ["Spanish"],
         "displayLanguageSelector": false,

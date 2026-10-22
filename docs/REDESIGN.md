@@ -1,5 +1,7 @@
 # Cuaderno de clase: rediseño
 
+> Documento histórico de desarrollo. Conserva el alcance, las pruebas y los pendientes de su etapa, incluidos módulos o pantallas anteriores. Para ClassNote 1.1.0 consulta el [README actual](../README.md), la [guía breve](QUICK_START.md) y las [notas vigentes](RELEASE_1.1.0.md). Los resultados de esta etapa no acreditan el nuevo instalador.
+
 La interfaz prioriza el trabajo diario de una maestra con un solo grupo pequeño. No impone un límite de siete alumnos ni agrega datos de ejemplo a la aplicación.
 
 - Navegación lateral: todas las secciones aparecen visibles, junto al grupo y el ciclo activos. En pantallas estrechas se convierte en una cabecera compacta con enlaces en dos columnas.

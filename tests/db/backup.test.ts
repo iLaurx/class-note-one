@@ -40,6 +40,29 @@ const setup = () => {
 const snapshot = (db: ClassNoteDatabase) =>
   db.transaction('r', db.tables, () => Promise.all(db.tables.map((table) => table.toArray())));
 
+test('1.1.0 exporta su versión y restaura respaldos 0.1.0 conservando las diez tablas', async (t) => {
+  const { db, r, service } = setup();
+  const destination = setup();
+  t.after(async () => {
+    await db.delete();
+    await destination.db.delete();
+  });
+  await fillRelated(r);
+  const before = await snapshot(db);
+  const source = await service.export();
+  assert.equal((await service.preview(source)).appVersion, '1.1.0');
+  const legacy = JSON.parse(source);
+  legacy.appVersion = '0.1.0';
+  const legacySource = JSON.stringify(legacy);
+  assert.equal((await destination.service.preview(legacySource)).appVersion, '0.1.0');
+  assert.equal(await destination.service.restore(legacySource, true, async () => true), true);
+  assert.deepEqual(await snapshot(destination.db), before);
+  assert.equal(
+    (await destination.service.preview(await destination.service.export())).appVersion,
+    '1.1.0',
+  );
+});
+
 test('fechas válidas: exportar, validar y restaurar las diez tablas sin perder historial', async (t) => {
   const { db, r, service } = setup();
   const destination = setup();

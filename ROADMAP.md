@@ -1,16 +1,24 @@
-# Roadmap — ClassNote
+# Roadmap de ClassNote
 
-## v0.1.0 — MVP offline Windows
-Infraestructura, ciclos/grupos, alumnos/matrículas, asistencia, tareas/entregas, lectura, observaciones, libro Excel multihoja, backup/restauración, pruebas y instalador.
+## 1.1.0 — entrega actual en preparación
 
-## v0.2.0 — Flujo docente
-Importación segura de alumnos desde Excel, filtros y vistas mensuales, plantillas de reportes, mejoras de accesibilidad, búsqueda global, acceso rápido por teclado.
+Aplicación Windows offline con interfaz simplificada, ciclos y grupo activo, alumnos, asistencia, tareas y entregas, reportes Excel configurables y respaldo/restauración. Lecturas y Observaciones permanecen ocultas; sus datos históricos se conservan.
 
-## v0.3.0 — Evaluación pedagógica
-Campos formativos, instrumentos de evaluación configurables, rúbricas, reportes de progreso y notas imprimibles (sin afirmar cumplimiento oficial SEP sin validación).
+La preparación de distribución incluye versión 1.1.0, WebView2 offline en el instalador, guías actuales y GitHub Releases. El estado comprobado y los pendientes están en [RELEASE_1.1.0.md](docs/RELEASE_1.1.0.md).
 
-## Futuro / sujeto a investigación
-Cifrado local seguro, exportaciones avanzadas, multiplataforma, transferencia entre dispositivos y sincronización opcional; ninguna está comprometida para el MVP.
+## Próximas mejoras por decidir
 
-## Prioridad transversal
-Compatibilidad Windows, integridad de datos, privacidad de menores, copias de seguridad y una interfaz sencilla valen más que incorporar módulos nuevos.
+- Firma digital y automatización de compilación/publicación.
+- Validación de actualización entre versiones y otros entornos Windows.
+- Importación segura de alumnos desde Excel.
+- Mejoras de accesibilidad y uso cotidiano según necesidades reales.
+
+No hay fechas comprometidas ni promesas de estas funciones.
+
+## Fuera del alcance actual
+
+Sincronización entre equipos, cuentas, recuperación remota, cifrado propio, actualizaciones automáticas y versiones macOS/Linux.
+
+## Prioridades
+
+Integridad de registros, respaldos, privacidad y sencillez de uso. La planificación histórica 0.1.0/0.2.0/0.3.0 no describe funciones garantizadas del producto actual.

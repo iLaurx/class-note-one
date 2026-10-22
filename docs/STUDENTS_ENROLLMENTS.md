@@ -1,5 +1,7 @@
 # CN-005 — Alumnos y matrículas
 
+> Documento histórico de desarrollo. Conserva el alcance, las pruebas y los pendientes de su etapa, incluidos módulos o pantallas anteriores. Para ClassNote 1.1.0 consulta el [README actual](../README.md), la [guía breve](QUICK_START.md) y las [notas vigentes](RELEASE_1.1.0.md). Los resultados de esta etapa no acreditan el nuevo instalador.
+
 Alcance exclusivo: fichas globales, pertenencia al grupo, búsqueda, detalle e historial. El dashboard mantiene su demostración y avisos. No hay resúmenes, contactos, importaciones, promoción automática, CI, backend ni dependencias nuevas.
 
 ## Uso

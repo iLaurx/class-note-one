@@ -1,5 +1,7 @@
 # CN-001A — App Shell y navegación (etapa 02)
 
+> Documento histórico de desarrollo. Conserva el alcance, las pruebas y los pendientes de su etapa, incluidos módulos o pantallas anteriores. Para ClassNote 1.1.0 consulta el [README actual](../README.md), la [guía breve](QUICK_START.md) y las [notas vigentes](RELEASE_1.1.0.md). Los resultados de esta etapa no acreditan el nuevo instalador.
+
 Alcance: estructura visual con ocho secciones, dashboard demostrativo y placeholders
 sin formularios, operaciones de dominio, almacenamiento ni APIs nativas.
 

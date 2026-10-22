@@ -1,5 +1,10 @@
 # Modelo de datos implementado — Dexie v1 (CN-003)
 
+## Compatibilidad en 1.1.0
+
+No cambia el esquema v1 ni las diez tablas. Lecturas y observaciones históricas se conservan aunque estén ocultas. Los respaldos nuevos tienen appVersion 1.1.0; se aceptan 0.1.0 y 1.1.0 con formato/esquema v1 e integridad válida. Las referencias a appVersion 0.1.0 más abajo documentan el contrato de su etapa original.
+
+
 > Implementación: `src/domain/models.ts` y `src/db/database.ts`. Base estable `classnote`, esquema `db.version(1)`. IDs UUID generados internamente; fechas de día `YYYY-MM-DD` locales y reales; todas las entidades de dominio incluyen `createdAt/updatedAt` ISO UTC. `appSettings` no lleva ID ni auditoría.
 
 ## Entidades

@@ -1,5 +1,10 @@
 # Registro de decisiones arquitectónicas
 
+## ADR-017 — Distribución 1.1.0
+
+Actualiza la decisión de distribución de ADR-016: producto ClassNote 1.1.0, NSIS x64 en español por usuario e inclusión de WebView2 mediante offlineInstaller. Se mantienen identificador, origen, perfil, esquema v1, CSP y permisos. Sin firma digital ni actualizador automático. Los respaldos nuevos indican 1.1.0 y el lector acepta además 0.1.0, sin aceptar versiones desconocidas. Seis secciones visibles; Lecturas y Observaciones permanecen ocultas con historia conservada. Distribución por GitHub Releases; estado y pendientes en [RELEASE_1.1.0.md](docs/RELEASE_1.1.0.md). Las decisiones previas se conservan como historia.
+
+
 ## ADR-001 — Aplicación de escritorio con Tauri 2
 **Estado:** aceptada para MVP. **Motivo:** instalador Windows y capacidad offline sin servidor. **Trade-off:** toolchain de Rust/Tauri y dependencia de WebView2; necesita QA real en Windows.
 

@@ -1,5 +1,9 @@
 # Respaldo completo y restauración — CN-012
 
+## Vigencia en 1.1.0
+
+Acceso: Configuración → Respaldos y recuperación. La exportación indica 1.1.0; el lector conserva compatibilidad con respaldos 0.1.0 válidos. No cambian esquema, diez tablas, validación, confirmación ni copia previa. Incluye datos históricos de módulos ocultos. Los resultados CN siguientes documentan ejecuciones históricas, no la prueba del nuevo instalador.
+
 ## Revalidación CN-013 (20/10/2026)
 
 Matriz vigente y límites: [HARDENING.md](HARDENING.md). Suite global 63 DB + 2
@@ -42,11 +46,9 @@ Un error conserva la previsualización y permite volver a confirmar o cancelar.
 
 ## Contrato y límites
 
-JSON UTF-8 con `format: classnote-backup`, `formatVersion: 1`, `appVersion: 0.1.0`,
+JSON UTF-8 con `format: classnote-backup`, `formatVersion: 1`, `appVersion: 1.1.0`,
 `schemaVersion: 1`, `createdAt` ISO UTC y `data` con el export completo de
-`dexie-export-import` 4.4.1. Se conserva Dexie v1; no hay migración. Esta primera
-versión acepta únicamente esas versiones exactas: las futuras necesitan una decisión
-explícita de compatibilidad. No importa Excel, formatos futuros ni datos reparados.
+`dexie-export-import` 4.4.1. Se conserva Dexie v1; no hay migración. ClassNote 1.1.0 acepta appVersion 0.1.0 y 1.1.0 con formato y esquema v1. Las versiones desconocidas necesitan una decisión explícita de compatibilidad. No importa Excel, formatos futuros ni datos reparados.
 
 Se validan entradas como unknown: sobre/campos exactos, diez tablas declaradas y
 presentes con índices v1 exactos, conteos, UUID, auditoría UTC válida, texto normalizado,

@@ -1,5 +1,7 @@
 # CN-001 — Inicialización de ClassNote
 
+> Documento histórico de desarrollo. Conserva el alcance, las pruebas y los pendientes de su etapa, incluidos módulos o pantallas anteriores. Para ClassNote 1.1.0 consulta el [README actual](../README.md), la [guía breve](QUICK_START.md) y las [notas vigentes](RELEASE_1.1.0.md). Los resultados de esta etapa no acreditan el nuevo instalador.
+
 Alcance: etapa 01, base Tauri 2 + React + TypeScript estricto + Vite + Tailwind CSS,
 pnpm, ESLint y Prettier. Sin módulos escolares ni persistencia. CN-002 conserva CI
 y las pruebas de componentes y dominio; la calidad mínima fue solicitada en etapa 01.

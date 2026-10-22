@@ -1,5 +1,10 @@
 # Arquitectura técnica — ClassNote
 
+## Estado de 1.1.0
+
+Seis secciones visibles: Inicio, Asistencia, Tareas, Alumnos, Reportes y Configuración. Los componentes y tablas de lecturas/observaciones se conservan para historia y respaldos, sin rutas ni selección de esos módulos en la interfaz. NSIS x64 por usuario incluye el instalador WebView2 Evergreen offline. Identificador org.classnote.desktop, origen http://tauri.localhost y esquema Dexie v1 estables; no hay actualizador automático. Los respaldos nuevos indican 1.1.0 y se admiten 0.1.0 y 1.1.0 con esquema/formato v1.
+
+
 ## Decisión base
 App instalable Windows: **Tauri 2** aloja UI **React + Vite + TypeScript** dentro de **WebView2**. **Dexie.js** accede a **IndexedDB** en el perfil persistente de WebView2. **ExcelJS** genera `.xlsx`. **dexie-export-import** crea/importa backups estructurados. No hay backend, servidor o cuenta.
 

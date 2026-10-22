@@ -1,5 +1,7 @@
 # CN-006 — Asistencia diaria
 
+> Documento histórico de desarrollo. Conserva el alcance, las pruebas y los pendientes de su etapa, incluidos módulos o pantallas anteriores. Para ClassNote 1.1.0 consulta el [README actual](../README.md), la [guía breve](QUICK_START.md) y las [notas vigentes](RELEASE_1.1.0.md). Los resultados de esta etapa no acreditan el nuevo instalador.
+
 Alcance exclusivo de CN-006. UI en `src/features/attendance/`, casos de lectura/guardado en los repositorios existentes e integración pequeña con navegación y contexto. Sin dependencias, stores, índices, migraciones, permisos ni cambios de CSP. Dexie conserva v1. CN-002 y CN-013 siguen pendientes.
 
 ## Uso y reglas

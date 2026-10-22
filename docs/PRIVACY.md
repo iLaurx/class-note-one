@@ -1,4 +1,6 @@
-# Información de privacidad — ClassNote 0.1.0
+# Información de privacidad — ClassNote 1.1.0
+
+Lecturas y Observaciones no aparecen en la interfaz ni en la selección de reportes de 1.1.0. Los registros históricos de esos módulos siguen formando parte de la base y del respaldo completo; ocultarlos no los elimina.
 
 ClassNote guarda localmente los registros que introduce la docente: ciclos,
 grupos, nombres y apellidos, matrículas, asistencia, tareas y entregas, lecturas,

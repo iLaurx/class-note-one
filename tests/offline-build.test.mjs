@@ -27,5 +27,5 @@ test('la aplicación distribuida bloquea red y no concede permisos generales de 
   assert.match(config.app.security.csp, /connect-src 'none'(?:;|$)/);
   assert.doesNotMatch(config.app.security.csp, /https?:|unsafe-eval|unsafe-inline/);
   assert.deepEqual(config.app.security.capabilities, []);
-  assert.equal(config.bundle.windows.webviewInstallMode.type, 'skip');
+  assert.equal(config.bundle.windows.webviewInstallMode.type, 'offlineInstaller');
 });

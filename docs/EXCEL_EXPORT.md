@@ -1,5 +1,9 @@
 # Exportación Excel — CN-011
 
+## Reportes actuales de 1.1.0
+
+El flujo vigente y el formato configurable están en [REPORTS.md](REPORTS.md). Se elige semana, mes, ciclo o fechas libres, contenido y alumnos; las hojas dependen de esa selección. Lecturas y Observaciones no son seleccionables. El contrato de cuatro hojas y las instrucciones CN-011 siguientes son históricos y no describen las opciones actuales. El Excel sigue siendo un reporte no restaurable.
+
 ## Uso y contrato
 
 En Reportes, seleccionar Desde/Hasta y luego Exportar Excel. El grado activo se

@@ -1,5 +1,12 @@
 # Plan de pruebas
 
+## Preparación de 1.1.0
+
+El usuario comunicó el 21/10/2026 la aceptación de sus pruebas funcionales. Las comprobaciones nuevas del cambio de versión, los respaldos compatibles y el instalador offline se registran en [RELEASE_1.1.0.md](docs/RELEASE_1.1.0.md). La prueba en otra PC queda pendiente hasta preparar la descarga.
+
+Los apartados CN siguientes son históricos: conservan conteos y resultados de sus ejecuciones, no representan automáticamente el estado de 1.1.0. La interfaz actual tiene seis secciones, sin Lecturas ni Observaciones visibles.
+
+
 ## CN-014 — preparación de v0.1.0 (20/10/2026)
 
 CN-013 se considera completada por decisión explícita del usuario para esta

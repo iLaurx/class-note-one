@@ -2,6 +2,7 @@ import { ClassNoteDatabase } from '../../db/database.ts';
 import { requireRule } from '../../domain/validation.ts';
 import { parseBackup, TABLE_NAMES, validateRows, type BackupRows } from './validation.ts';
 import { asBackupError } from './errors.ts';
+import { APP_VERSION } from './version.ts';
 
 // Lazy import keeps the addon and file readers out of ordinary application startup.
 const addon = () => import('dexie-export-import');
@@ -55,7 +56,7 @@ export class BackupService {
     const source = JSON.stringify({
       format: 'classnote-backup',
       formatVersion: 1,
-      appVersion: '0.1.0',
+      appVersion: APP_VERSION,
       schemaVersion: 1,
       createdAt: new Date().toISOString(),
       data,
