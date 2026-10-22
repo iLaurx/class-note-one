@@ -40,6 +40,7 @@ for (const width of [1100, 360]) {
     ).toBeVisible();
     await detail.getByRole('button', { name: 'Entregada', exact: true }).click();
     await detail.getByRole('button', { name: /^Guardar entregas/ }).click();
+    await expect(detail).toHaveAttribute('aria-busy', 'false');
     await expect(detail.getByRole('button', { name: /^Guardar entregas/ })).toBeDisabled();
     await page.getByRole('button', { name: 'Volver al listado', exact: true }).click();
     await page.getByRole('button', { name: 'Editar tarea Para conservar', exact: true }).click();

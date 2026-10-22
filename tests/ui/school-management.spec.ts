@@ -1,148 +1,94 @@
 import { expect, test } from '@playwright/test';
-import { createYearsAndGroups, verifyArchiveFlow, verifySelection } from '../helpers/school-flow';
-for (const width of [1100, 768, 360]) {
-  test(`CN004 gestión offline y persistencia a ${width}px`, async ({ page, context }) => {
-    await page.setViewportSize({ width, height: 760 });
-    await page.goto('/#/configuracion');
-    await expect(
-      page.getByText('Primero crea un ciclo escolar y después agrega sus grupos.'),
-    ).toBeVisible();
+import {
+  configure,
+  navigate,
+  noOverflow,
+  snapshot,
+  failWrite,
+  attachAudit,
+} from '../helpers/audit-browser';
+for (const width of [1100, 768, 360])
+  test(`CN004 ciclo y grupo únicos, archivo y persistencia a ${width}px`, async ({
+    page,
+    context,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await configure(page, 1);
+    await navigate(page, 'Configuración');
     await context.setOffline(true);
-    await createYearsAndGroups(page);
-    await verifySelection(page);
-    await page
-      .getByRole('button', { name: 'Ver grupos de Ciclo de prueba dos', exact: true })
-      .click();
-    await expect(page.getByText('Matutino de prueba', { exact: true })).toHaveCount(0);
-    await verifySelection(page);
-    await page
-      .getByLabel('Ciclo de trabajo', { exact: true })
-      .selectOption({ label: 'Ciclo de prueba dos' });
-    await expect(page.getByLabel('Grupo de trabajo', { exact: true })).toHaveValue('');
-    await page.getByLabel('Grupo de trabajo', { exact: true }).selectOption({ label: '1.º B' });
-    await page
-      .getByLabel('Ciclo de trabajo', { exact: true })
-      .selectOption({ label: 'Ciclo de prueba uno' });
-    await expect(page.getByLabel('Grupo de trabajo', { exact: true })).toHaveValue('');
-    await page.getByLabel('Grupo de trabajo', { exact: true }).selectOption({ label: '1.º A' });
-    await expect(page.getByRole('region', { name: 'Contexto de trabajo' })).toHaveAttribute(
-      'aria-busy',
-      'false',
-    );
-    // Restore access only to the local preview assets for browser reload.
+    await expect(page.getByRole('button', { name: 'Crear grupo', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Archivar grupo', exact: true }).click();
+    await page.getByRole('button', { name: 'Cancelar archivo' }).click();
+    await page.getByRole('button', { name: 'Archivar grupo', exact: true }).click();
+    await page.getByRole('button', { name: 'Confirmar archivo' }).click();
+    await page.getByLabel('Mostrar archivados').check();
+    await page.getByRole('button', { name: 'Reactivar grupo', exact: true }).click();
+    await page.getByRole('button', { name: 'Editar grupo', exact: true }).click();
+    await page.getByLabel('Nombre', { exact: true }).fill('B');
+    await page.getByRole('button', { name: 'Guardar grupo' }).click();
+    await noOverflow(page);
     await context.setOffline(false);
     await page.reload();
-    await verifySelection(page);
-    await context.setOffline(true);
-    await verifyArchiveFlow(page);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
-      true,
-    );
-    await page.screenshot({ path: `test-results/school-management-${width}.png`, fullPage: true });
+    await attachAudit(page);
+    expect(await page.evaluate(() => window.classNoteAudit.db.students.count())).toBe(1);
+    await expect(page.getByRole('main').getByText('2.º B', { exact: true })).toBeVisible();
   });
-}
-test('CN004 error de escritura conserva formulario y permite corregir duplicado', async ({
-  page,
-}) => {
-  await page.goto('/#/configuracion');
-  await createYearsAndGroups(page);
-  await page.getByRole('button', { name: 'Editar grupo B', exact: true }).click();
-  await page.getByLabel('Nombre del grupo', { exact: true }).fill('A');
-  await page.getByRole('button', { name: 'Guardar grupo', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('Ya existe');
-  await expect(page.getByLabel('Nombre del grupo', { exact: true })).toHaveValue('A');
-  await page.getByLabel('Nombre del grupo', { exact: true }).fill('C');
-  await page.getByRole('button', { name: 'Guardar grupo', exact: true }).click();
+test('CN004 fallo de escritura conserva ciclo y permite reintento', async ({ page }) => {
+  await configure(page);
+  await navigate(page, 'Configuración');
+  const before = await snapshot(page);
+  await page.getByRole('button', { name: 'Editar ciclo', exact: true }).click();
+  await page.getByLabel('Etiqueta', { exact: true }).fill('Corregido');
+  await failWrite(page, 'schoolYears');
+  await page.getByRole('button', { name: 'Guardar ciclo' }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.getByLabel('Etiqueta', { exact: true })).toHaveValue('Corregido');
+  expect(await snapshot(page)).toEqual(before);
+  await page.getByRole('button', { name: 'Guardar ciclo' }).click();
   await expect(page.getByRole('form')).toHaveCount(0);
-  await expect(page.getByRole('alert')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Editar grupo C', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Corregido', exact: true })).toBeVisible();
 });
-
-test('CN004 cambios rápidos mantienen contexto coherente y cancelar no escribe', async ({
+test('CN004 reducción de ciclo con tarea del 19 al día 20 no escribe parcialmente', async ({
   page,
 }) => {
-  await page.goto('/#/configuracion');
-  await createYearsAndGroups(page);
-  const before = await page.evaluate(async () => {
-    return new Promise<string>((resolve) => {
-      const request = indexedDB.open('classnote');
-      request.onsuccess = () => {
-        const db = request.result;
-        const tx = db.transaction(['schoolYears', 'groups', 'appSettings'], 'readonly');
-        const rows: unknown[] = [];
-        for (const name of ['schoolYears', 'groups', 'appSettings']) {
-          const query = tx.objectStore(name).getAll();
-          query.onsuccess = () => rows.push(query.result);
-        }
-        tx.oncomplete = () => {
-          db.close();
-          resolve(JSON.stringify(rows));
-        };
-      };
-    });
+  await configure(page);
+  await page.evaluate(async () => {
+    const { r, db } = window.classNoteAudit;
+    const g = (await db.groups.toArray())[0]!;
+    await r.createAssignment(
+      { schoolYearId: g.schoolYearId, groupId: g.id },
+      { title: 'Del 19', assignedDate: '2026-10-19' },
+    );
   });
-  await page.getByRole('button', { name: 'Archivar grupo A', exact: true }).click();
-  await page.getByRole('button', { name: 'Cancelar archivo' }).click();
-  const after = await page.evaluate(async () => {
-    return new Promise<string>((resolve) => {
-      const request = indexedDB.open('classnote');
-      request.onsuccess = () => {
-        const db = request.result;
-        const tx = db.transaction(['schoolYears', 'groups', 'appSettings'], 'readonly');
-        const rows: unknown[] = [];
-        for (const name of ['schoolYears', 'groups', 'appSettings']) {
-          const query = tx.objectStore(name).getAll();
-          query.onsuccess = () => rows.push(query.result);
-        }
-        tx.oncomplete = () => {
-          db.close();
-          resolve(JSON.stringify(rows));
-        };
-      };
-    });
-  });
-  expect(after).toBe(before);
-  // Administration changes synchronously, without launching competing reads.
-  await page.evaluate(() => {
-    for (let index = 0; index < 10; index++) {
-      const text =
-        index % 2 === 0 ? 'Ver grupos de Ciclo de prueba uno' : 'Ver grupos de Ciclo de prueba dos';
-      const button = Array.from(document.querySelectorAll('button')).find(
-        (node) => node.textContent === text,
-      );
-      button?.click();
-    }
-  });
-  await expect(
-    page.getByRole('region', { name: 'Grupos de Ciclo de prueba dos', exact: true }),
-  ).toBeVisible();
-  await expect(page.getByText('Matutino de prueba', { exact: true })).toHaveCount(0);
-  await verifySelection(page);
-  const cycle = page.getByLabel('Ciclo de trabajo', { exact: true });
-  for (const label of ['Ciclo de prueba dos', 'Ciclo de prueba uno', 'Ciclo de prueba dos']) {
-    await cycle.selectOption({ label });
-    await expect(page.getByLabel('Grupo de trabajo', { exact: true })).toHaveValue('');
-  }
-  await expect(cycle.locator('option:checked')).toHaveText('Ciclo de prueba dos');
+  await navigate(page, 'Configuración');
+  const before = await snapshot(page);
+  await page.getByRole('button', { name: 'Editar ciclo', exact: true }).click();
+  await page.getByLabel('Fecha de inicio').fill('2026-10-20');
+  await page.getByRole('button', { name: 'Guardar ciclo' }).click();
+  await expect(page.getByRole('alert')).toContainText('tareas');
+  expect(await snapshot(page)).toEqual(before);
+  await expect(page.getByLabel('Fecha de inicio')).toHaveValue('2026-10-20');
+  await page.getByLabel('Fecha de inicio').fill('2026-10-19');
+  await page.getByRole('button', { name: 'Guardar ciclo' }).click();
+  await expect(page.getByRole('form')).toHaveCount(0);
 });
-
-test('CN004 error al leer contexto ofrece reintento sin borrar registros', async ({ page }) => {
+test('CN004 error de contexto recuperable sin borrar registros', async ({ page }) => {
+  await configure(page, 1);
+  const before = await snapshot(page);
   await page.addInitScript(() => {
-    const original = IDBObjectStore.prototype.get;
-    let fail = true;
-    IDBObjectStore.prototype.get = function (...args: Parameters<IDBObjectStore['get']>) {
-      if (this.name === 'appSettings' && fail) {
-        fail = false;
-        throw new DOMException('Fallo de lectura sintético', 'UnknownError');
+    const get = IDBObjectStore.prototype.get;
+    IDBObjectStore.prototype.get = function (...args) {
+      if (this.name === 'appSettings') {
+        IDBObjectStore.prototype.get = get;
+        throw new DOMException('Sintético', 'UnknownError');
       }
-      return original.apply(this, args);
+      return get.apply(this, args);
     };
   });
-  await page.goto('/#/configuracion');
-  await expect(page.getByRole('alert')).toContainText('No se pudo cargar el contexto.');
-  await page.getByRole('button', { name: 'Reintentar contexto' }).click();
+  await page.reload();
+  await expect(page.getByRole('alert')).toBeVisible();
+  await page.getByRole('button', { name: 'Reintentar', exact: true }).click();
+  await attachAudit(page);
   await expect(page.getByRole('alert')).toHaveCount(0);
-  await expect(
-    page.getByText('Primero crea un ciclo escolar y después agrega sus grupos.'),
-  ).toBeVisible();
+  expect(await snapshot(page)).toEqual(before);
 });

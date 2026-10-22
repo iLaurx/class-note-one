@@ -6,7 +6,6 @@ import { Repositories } from '../../src/db/repositories.ts';
 import { BackupService } from '../../src/services/backup/backupService.ts';
 import { createFixture, fillRelated } from './fixtures.ts';
 import { BackupOperationError } from '../../src/services/backup/errors.ts';
-
 // Browser FileReader contract needed by the addon; no product fallback or test hook.
 Object.assign(globalThis, {
   self: globalThis,
@@ -34,13 +33,48 @@ Object.assign(globalThis, {
     }
   },
 });
-
 const setup = () => {
   const db = new ClassNoteDatabase(`backup-test-${crypto.randomUUID()}`);
   return { db, r: new Repositories(db), service: new BackupService(db) };
 };
 const snapshot = (db: ClassNoteDatabase) =>
   db.transaction('r', db.tables, () => Promise.all(db.tables.map((table) => table.toArray())));
+
+test('fechas válidas: exportar, validar y restaurar las diez tablas sin perder historial', async (t) => {
+  const { db, r, service } = setup();
+  const destination = setup();
+  t.after(async () => {
+    await db.delete();
+    await destination.db.delete();
+  });
+  const f = await fillRelated(r);
+  await r.updateAssignment(
+    f.context,
+    f.assignment.id,
+    { ...f.assignment, dueDate: '2026-10-20' },
+    f.assignment,
+  );
+  await r.updateSchoolYear(f.year.id, {
+    ...f.year,
+    startDate: '2026-10-19',
+    endDate: '2026-10-20',
+  });
+  await r.updateEnrollment(f.enrollmentContext, { status: 'inactive', leftAt: '2026-10-19' });
+  const before = await snapshot(db);
+  const source = await service.export();
+  const preview = await service.preview(source);
+  for (const table of [
+    'attendance',
+    'assignments',
+    'submissions',
+    'readingLogs',
+    'studentNotes',
+  ] as const)
+    assert.equal(preview.counts[table], 1);
+  assert.equal(await destination.service.restore(source, true, async () => true), true);
+  assert.deepEqual(await snapshot(destination.db), before);
+  await destination.service.preview(await destination.service.export());
+});
 
 test('CN012 diez tablas vacías y relacionadas, metadatos/conteos y reemplazo exacto sin residuos', async (t) => {
   const { db, r, service } = setup();
@@ -282,11 +316,11 @@ test('CN012 selección inválida se sanea solo después de restaurar; historial 
   t.after(() => db.delete());
   const fixture = await fillRelated(r);
   await r.setStudentActive(fixture.student.id, false);
-  await r.createSetting({ key: 'work.schoolYearId', value: crypto.randomUUID() });
-  await r.createSetting({ key: 'work.groupId', value: crypto.randomUUID() });
+  await db.appSettings.put({ key: 'work.schoolYearId', value: crypto.randomUUID() });
+  await db.appSettings.put({ key: 'work.groupId', value: crypto.randomUUID() });
   const source = await service.export();
   assert.equal(await service.restore(source, true, async () => true), true);
-  assert.deepEqual((await r.loadWorkspace()).selection, { schoolYearId: null, groupId: null });
+  assert.deepEqual((await r.loadWorkspace()).selection, fixture.context);
   assert.equal(await db.submissions.count(), 1);
   assert.equal((await db.students.get(fixture.student.id))?.active, false);
   assert.equal((await db.enrollments.get(fixture.enrollment.id))?.status, 'inactive');
@@ -325,8 +359,8 @@ test('total del grupo conserva cuatro restaurados más un alta manual con fechas
     summary.groupStudents,
     group.filter((row) => row.enrollment.status === 'active').length,
   );
-  assert.equal(summary.students, 1);
-  assert.equal(summary.attendance?.total, 1);
+  assert.equal(summary.students, 5);
+  assert.equal(summary.attendance?.total, 5);
   assert.equal((await destination.r.loadDashboard(f.context, '2026-10-26')).students, 5);
   const outside = await destination.r.loadDashboard(f.context, '2027-08-01');
   assert.equal(outside.groupStudents, 5);

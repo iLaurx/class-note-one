@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import path from 'node:path';
-import { createYearsAndGroups } from '../helpers/school-flow';
+import { configure } from '../helpers/audit-browser';
 
 async function snapshot(page: Page) {
   return page.evaluate(async () => {
@@ -34,11 +34,12 @@ async function prepare(page: Page) {
     }),
   );
   await page.goto('/');
-  await createYearsAndGroups(page);
+  await configure(page);
   await page
     .getByRole('navigation')
     .getByRole('link', { name: 'Configuración', exact: true })
     .click();
+  await page.getByText('Respaldos y recuperación', { exact: true }).click();
   await page.evaluate(() => {
     const check = { source: '', previous: '', mode: 'ok', saves: 0 };
     Object.assign(window, {
@@ -92,8 +93,8 @@ for (const width of [1100, 768, 360])
     const before = await snapshot(page);
     await openButton(page).click();
     await expect(page.getByRole('region', { name: 'Previsualización del respaldo' })).toBeVisible();
-    await expect(page.getByText('Ciclos escolares: 2', { exact: true })).toBeVisible();
-    await expect(page.getByText('Grupos: 4', { exact: true })).toBeVisible();
+    await expect(page.getByText('Ciclos escolares: 1', { exact: true })).toBeVisible();
+    await expect(page.getByText('Grupos: 1', { exact: true })).toBeVisible();
     await expect(page.getByText('Observaciones privadas: 0', { exact: true })).toBeVisible();
     await expect(
       page.getByRole('button', { name: 'Cancelar restauración', exact: true }),

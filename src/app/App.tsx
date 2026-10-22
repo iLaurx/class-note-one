@@ -1,3 +1,5 @@
+import { allowNavigation } from './pendingChanges';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 import { Reports } from '../features/reports/Reports';
 import { Assignments } from '../features/assignments/Assignments';
 import { Students } from '../features/students/Students';
@@ -21,6 +23,15 @@ export function App() {
   const [settingsRevision, setSettingsRevision] = useState(0);
   const mainRef = useRef<HTMLElement>(null);
   const previousSection = useRef(current?.id);
+
+  useEffect(() => {
+    if (!isTauri()) return;
+    const close = () => {
+      if (allowNavigation()) void invoke('close_main_window');
+    };
+    window.addEventListener('classnote-close-requested', close);
+    return () => window.removeEventListener('classnote-close-requested', close);
+  }, []);
 
   useEffect(() => {
     document.title = `${current?.label ?? 'Sección no encontrada'} · ClassNote`;

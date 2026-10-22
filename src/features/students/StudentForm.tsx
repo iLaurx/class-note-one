@@ -2,6 +2,8 @@ import { useState, type SubmitEvent } from 'react';
 import type { Group, SchoolYear } from '../../domain/models';
 import type { useStudents } from './useStudents';
 import type { StudentFormState } from './studentFormState';
+import { allowNavigation } from '../../app/pendingChanges';
+import { useDraftGuard } from '../assignments/useDraftGuard';
 import { fullName } from './studentPresentation';
 export function StudentForm({
   form,
@@ -21,6 +23,11 @@ export function StudentForm({
   const [firstName, setFirst] = useState(student?.firstName ?? '');
   const [lastName, setLast] = useState(student?.lastName ?? '');
   const [leftAt, setLeft] = useState(enrollment?.leftAt ?? '');
+  const dirty =
+    firstName !== (student?.firstName ?? '') ||
+    lastName !== (student?.lastName ?? '') ||
+    leftAt !== (enrollment?.leftAt ?? '');
+  useDraftGuard(dirty, state.busy, 'alumnos');
   const titles = {
     new: 'Nuevo alumno',
     edit: 'Editar ficha',
@@ -31,6 +38,7 @@ export function StudentForm({
   };
   async function save(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (state.busy) return;
     const context = { schoolYearId: year.id, groupId: group.id };
     if (
       await state.run(async (r) => {
@@ -74,13 +82,19 @@ export function StudentForm({
             <input
               autoFocus={form.kind === 'edit'}
               required
+              disabled={state.busy}
               value={firstName}
               onChange={(e) => setFirst(e.target.value)}
             />
           </label>
           <label>
             Apellido o apellidos
-            <input required value={lastName} onChange={(e) => setLast(e.target.value)} />
+            <input
+              required
+              disabled={state.busy}
+              value={lastName}
+              onChange={(e) => setLast(e.target.value)}
+            />
           </label>
         </>
       )}
@@ -91,6 +105,7 @@ export function StudentForm({
               <label>
                 Fecha de salida (opcional)
                 <input
+                  disabled={state.busy}
                   type="date"
                   min={year.startDate}
                   max={year.endDate}
@@ -132,7 +147,13 @@ export function StudentForm({
               ? 'Confirmar baja'
               : 'Guardar alumno'}
         </button>
-        <button disabled={state.busy} type="button" onClick={done}>
+        <button
+          disabled={state.busy}
+          type="button"
+          onClick={() => {
+            if (allowNavigation()) done();
+          }}
+        >
           Cancelar formulario
         </button>
       </div>

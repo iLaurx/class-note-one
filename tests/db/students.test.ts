@@ -18,13 +18,13 @@ test('CN005 alta atómica, homónimos, entradas inválidas y rollback real al fa
   const two = await r.createStudentWithEnrollment(f.context, studentInput);
   assert.notEqual(one.student.id, two.student.id);
   assert.equal(one.student.firstName, 'Ána');
+  // The removed input is ignored, including invalid/future legacy values; the cycle governs visibility.
+  for (const joinedAt of ['2026-02-30', '2027-08-01']) {
+    const legacy = await r.createStudentWithEnrollment(f.context, { ...studentInput, joinedAt });
+    assert.equal(Object.hasOwn(legacy.enrollment, 'joinedAt'), false);
+  }
   const before = await db.students.toArray();
-  for (const fields of [
-    { firstName: ' ' },
-    { lastName: '' },
-    { joinedAt: '2026-02-30' },
-    { joinedAt: '2027-08-01' },
-  ])
+  for (const fields of [{ firstName: ' ' }, { lastName: '' }])
     await assert.rejects(r.createStudentWithEnrollment(f.context, { ...studentInput, ...fields }));
   const fail = () => {
     throw new Error('Fallo sintético');
@@ -39,6 +39,11 @@ test('CN005 misma ficha en otro ciclo/grado, edición e historial y consultas ai
   const { db, r } = setup();
   t.after(() => db.delete());
   const f = await fillRelated(r);
+  for (const joinedAt of ['2026-10-20', '2026-02-30']) {
+    const unchanged = await r.updateEnrollment(f.enrollmentContext, { ...f.enrollment, joinedAt });
+    assert.equal(Object.hasOwn(unchanged, 'joinedAt'), false);
+    assert.equal((await r.listAttendance(f.enrollmentContext)).length, 1);
+  }
   const related = await Promise.all([
     db.attendance.toArray(),
     db.submissions.toArray(),
@@ -103,6 +108,7 @@ test('CN005 duplicados concurrentes y contexto archivado o alumno inactivo recha
   );
   assert.equal(results.filter((x) => x.status === 'fulfilled').length, 1);
   await r.setStudentActive(s.id, false);
+  await r.archiveGroup(f.context);
   const g = await r.createGroup({ schoolYearId: f.year.id, grade: 3, name: 'C' });
   const c = { ...f.context, groupId: g.id };
   await assert.rejects(
@@ -123,11 +129,9 @@ test('CN005 intervalos inclusivos protegen asistencias; baja y reactivación con
   t.after(() => db.delete());
   const f = await fillRelated(r);
   for (const fields of [
-    { joinedAt: '2026-10-20' },
     { leftAt: '2026-10-18' },
     { leftAt: '2028-01-01' },
     { leftAt: '2026-07-01' },
-    { joinedAt: '2026-02-30' },
   ])
     await assert.rejects(r.updateEnrollment(f.enrollmentContext, { ...f.enrollment, ...fields }));
   const leave = await r.updateEnrollment(f.enrollmentContext, {
@@ -156,6 +160,7 @@ test('CN005 archivo global atómico, cancelación por fallo y reactivación sin 
   const { db, r } = setup();
   t.after(() => db.delete());
   const f = await fillRelated(r);
+  await r.archiveGroup(f.context);
   const g = await r.createGroup({ schoolYearId: f.year.id, grade: 2, name: 'B' });
   const other = await r.createEnrollment(
     { ...f.context, groupId: g.id },
@@ -163,6 +168,8 @@ test('CN005 archivo global atómico, cancelación por fallo y reactivación sin 
   );
   await r.updateEnrollment(f.enrollmentContext, { ...f.enrollment, status: 'inactive' });
   assert.equal((await db.enrollments.get(other.id))?.status, 'active');
+  await r.archiveGroup({ ...f.context, groupId: g.id });
+  await r.reactivateGroup(f.context);
   await r.updateEnrollment(f.enrollmentContext, f.enrollment);
   const before = await Promise.all(db.tables.map((table) => table.toArray()));
   const fail = () => {
@@ -176,7 +183,7 @@ test('CN005 archivo global atómico, cancelación por fallo y reactivación sin 
   for (const e of await db.enrollments.toArray()) {
     assert.equal(e.status, 'inactive');
     assert.equal(e.leftAt, undefined);
-    assert.equal(e.joinedAt, f.year.startDate);
+    assert.equal(e.joinedAt, undefined);
   }
   await assert.rejects(r.updateEnrollment(f.enrollmentContext, f.enrollment));
   await r.setStudentActive(f.student.id, true);

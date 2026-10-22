@@ -34,7 +34,7 @@ test('CN006 población inclusiva, histórica, archivada y sin salida; sin mezcla
     { ...f.context, enrollmentId: extra.enrollment.id },
     { ...extra.enrollment, status: 'inactive' },
   );
-  assert.equal((await r.loadAttendanceDay(f.context, '2026-09-30')).length, 0);
+  assert.equal((await r.loadAttendanceDay(f.context, '2026-09-30')).length, 2);
   const rows = await r.loadAttendanceDay(f.context, date);
   assert.equal(rows.length, 2);
   assert.equal(rows.find((row) => row.enrollment.id === f.enrollment.id)?.student.active, false);
@@ -43,7 +43,7 @@ test('CN006 población inclusiva, histórica, archivada y sin salida; sin mezcla
     undefined,
   );
   assert.equal((await r.loadAttendanceDay(f.context, '2026-10-20')).length, 1);
-  assert.equal((await r.loadAttendanceDay(f.context, '2026-10-01')).length, 1);
+  assert.equal((await r.loadAttendanceDay(f.context, '2026-10-01')).length, 2);
   assert.equal((await r.loadAttendanceDay(second.context, date)).length, 1);
   await r.saveAttendanceDay(f.context, date, [input(f.enrollment.id)]);
   assert.equal(

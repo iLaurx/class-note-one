@@ -1,272 +1,243 @@
-import { expect, test, type Page } from '@playwright/test';
-import { createYearsAndGroups } from '../helpers/school-flow';
-import { createStudentHistory } from '../helpers/student-flow';
-import { prepareAttendanceStudents } from '../helpers/attendance-flow';
+import { expect, test } from '@playwright/test';
 import {
-  commentField,
+  configure,
+  navigate,
   createTask,
-  openAssignments,
-  prepareAssignments,
-  recordSubmissions,
-  saveDeliveries,
-  statusField,
-  taskTitle,
-} from '../helpers/assignment-flow';
-async function setup(page: Page) {
-  await page.goto('/');
-  await createYearsAndGroups(page);
-  await createStudentHistory(page);
-  await prepareAttendanceStudents(page);
-  await openAssignments(page);
-}
-for (const width of [1100, 768, 360]) {
-  test(`CN007 tareas/estados/comentarios/correcciones/filtros/aislamiento offline a ${width}px`, async ({
+  attachAudit,
+  snapshot,
+  failWrite,
+  noOverflow,
+} from '../helpers/audit-browser';
+for (const width of [1100, 768, 360])
+  test(`CN007 tareas, estados, comentarios, corrección y filtros offline a ${width}px`, async ({
     page,
     context,
   }) => {
     await page.setViewportSize({ width, height: 900 });
-    const errors: string[] = [];
-    const external: string[] = [];
-    page.on('pageerror', (error) => errors.push(error.message));
-    page.on('request', (req) => {
-      if (!req.url().startsWith('http://127.0.0.1:1421/')) external.push(req.url());
-    });
-    await setup(page);
+    await configure(page, 4);
+    await createTask(page);
     await context.setOffline(true);
-    await recordSubmissions(page);
-    await statusField(page, 1).focus();
-    await page.keyboard.press('ArrowDown');
-    await expect(statusField(page, 1)).toBeFocused();
-    await statusField(page, 1).selectOption('pending');
-    await expect(saveDeliveries(page)).toBeDisabled();
-    await page.getByLabel('Buscar alumno').fill('BRUNO');
-    await expect(statusField(page, 0)).toHaveCount(0);
-    await expect(statusField(page, 1)).toBeVisible();
-    await page.getByLabel('Buscar alumno').fill('');
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
-      true,
-    );
-    await page.screenshot({ path: `test-results/assignments-${width}.png`, fullPage: true });
-    expect(errors).toEqual([]);
-    expect(external).toEqual([]);
+    await page.getByRole('button', { name: 'Ver entregas de Tarea de prueba' }).click();
+    const groups = page.getByRole('group', { name: /Estado de/ });
+    await expect(groups).toHaveCount(4);
+    for (const [i, label] of ['Entregada', 'Pendiente', 'Incompleta', 'No entregada'].entries()) {
+      await groups.nth(i).getByRole('button', { name: label, exact: true }).click();
+      await page
+        .getByLabel(/Comentario de/)
+        .nth(i)
+        .fill('Comentario ' + i);
+    }
+    await page.getByText('Buscar y filtrar alumnos', { exact: true }).click();
+    await page.getByLabel('Filtrar entregas por estado').selectOption('not_submitted');
+    await expect(page.getByRole('button', { name: /Guardar entregas/ })).toContainText('(4)');
+    await page.getByRole('button', { name: /Guardar entregas/ }).click();
+    await expect(page.getByText('Entregas guardadas: 4.', { exact: true })).toBeVisible();
+    await page.getByLabel('Filtrar entregas por estado').selectOption('');
+    await groups.first().getByRole('button', { name: 'Incompleta', exact: true }).click();
+    page.once('dialog', (d) => d.dismiss());
+    await page.getByRole('button', { name: /Guardar entregas/ }).click();
+    await expect(page.getByRole('button', { name: /Guardar entregas/ })).toBeEnabled();
+    page.once('dialog', (d) => d.accept());
+    await page.getByRole('button', { name: /Guardar entregas/ }).click();
+    await expect(page.getByRole('button', { name: /Guardar entregas/ })).toBeDisabled();
+    await noOverflow(page);
+    await context.setOffline(false);
+    await page.reload();
+    await page.getByRole('button', { name: 'Ver entregas de Tarea de prueba' }).click();
+    await expect(page.getByLabel(/Comentario de/).nth(3)).toHaveValue('Comentario 3');
+    await expect(
+      groups.first().getByRole('button', { name: 'Incompleta', exact: true }),
+    ).toHaveAttribute('aria-pressed', 'true');
   });
-}
-
-test('CN007 protege formulario y entregas en tarea/sección/ciclo/grupo/historial', async ({
-  page,
-}) => {
-  await setup(page);
+test('CN007 protege formulario, reemplazo, navegación y entregas', async ({ page }) => {
+  await configure(page, 1);
+  await navigate(page, 'Tareas');
   await page.getByRole('button', { name: 'Crear tarea', exact: true }).click();
-  await page.getByLabel('Título', { exact: true }).fill('Borrador ficticio');
-  page.once('dialog', (dialog) => dialog.dismiss());
-  await page.getByRole('navigation').getByRole('link', { name: 'Inicio', exact: true }).click();
-  await expect(page.getByLabel('Título', { exact: true })).toHaveValue('Borrador ficticio');
-  page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: 'Cancelar tarea', exact: true }).click();
-  await page.getByRole('navigation').getByRole('link', { name: 'Alumnos', exact: true }).click();
-  await openAssignments(page);
-  await prepareAssignments(page);
-  await commentField(page, 0).fill('Sin guardar');
+  await page.getByLabel('Título', { exact: true }).fill('Borrador');
   for (const action of [
-    () => page.goBack(),
-    () =>
-      page
-        .getByRole('button', { name: 'Ver entregas de Otra tarea sintética', exact: true })
-        .click(),
-    () => page.getByRole('button', { name: `Editar tarea ${taskTitle}`, exact: true }).click(),
-    () => page.getByLabel('Grupo de trabajo', { exact: true }).selectOption({ label: '1.º B' }),
-    () =>
-      page
-        .getByLabel('Ciclo de trabajo', { exact: true })
-        .selectOption({ label: 'Ciclo de prueba dos' }),
+    () => page.getByRole('button', { name: 'Crear tarea', exact: true }).click(),
+    () => page.getByRole('button', { name: 'Volver al listado' }).click(),
     () => page.getByRole('navigation').getByRole('link', { name: 'Inicio', exact: true }).click(),
   ]) {
-    const confirmation = page.waitForEvent('dialog');
-    page.once('dialog', (dialog) => dialog.dismiss());
+    page.once('dialog', (d) => d.dismiss());
     await action();
-    await confirmation;
-    await expect(commentField(page, 0)).toHaveValue('Sin guardar');
-    await expect(page).toHaveURL(/#\/tareas$/);
+    await expect(page.getByLabel('Título', { exact: true })).toHaveValue('Borrador');
   }
-  page.once('dialog', (dialog) => dialog.accept());
-  await page
-    .getByRole('button', { name: 'Ver entregas de Otra tarea sintética', exact: true })
-    .click();
-  await expect(commentField(page, 0)).toHaveValue('');
+  page.once('dialog', (d) => d.accept());
+  await page.getByRole('button', { name: 'Cancelar tarea' }).click();
+  await createTask(page);
+  await page.getByRole('button', { name: 'Ver entregas de Tarea de prueba' }).click();
+  await page.getByLabel(/Comentario de/).fill('Entrega pendiente');
+  page.once('dialog', (d) => d.dismiss());
+  await page.getByRole('button', { name: 'Volver al listado' }).click();
+  await expect(page.getByLabel(/Comentario de/)).toHaveValue('Entrega pendiente');
 });
-
-test('CN007 error de escritura conserva borrador y fallo de lectura posterior no reenvía', async ({
+test('CN007 fallo de escritura conserva borrador y reintento no duplica', async ({ page }) => {
+  await configure(page, 1);
+  await navigate(page, 'Tareas');
+  const before = await snapshot(page);
+  await page.getByRole('button', { name: 'Crear tarea', exact: true }).click();
+  await page.getByLabel('Título', { exact: true }).fill('Reintento');
+  await failWrite(page, 'assignments', 'add');
+  await page.getByRole('button', { name: 'Guardar tarea' }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  expect(await snapshot(page)).toEqual(before);
+  await expect(page.getByLabel('Título', { exact: true })).toHaveValue('Reintento');
+  await page.getByRole('button', { name: 'Guardar tarea' }).dblclick({ force: true });
+  await expect(page.getByRole('form')).toHaveCount(0);
+  expect(await page.evaluate(() => window.classNoteAudit.db.assignments.count())).toBe(1);
+});
+test('CN007 dos ediciones conservan borrador en conflicto y recuperación explícita', async ({
+  page,
+  context,
+}) => {
+  await configure(page, 1);
+  await createTask(page);
+  await page.getByRole('button', { name: 'Editar tarea Tarea de prueba' }).click();
+  await page.getByLabel('Título', { exact: true }).fill('Mi borrador');
+  const second = await context.newPage();
+  await second.goto('/#/tareas');
+  await second.getByRole('button', { name: 'Editar tarea Tarea de prueba' }).click();
+  await second.getByLabel('Descripción (opcional)').fill('Guardado desde otra ventana');
+  await second.getByRole('button', { name: 'Guardar tarea' }).click();
+  await expect(second.getByRole('form')).toHaveCount(0);
+  const before = await snapshot(page);
+  await page.getByRole('button', { name: 'Guardar tarea' }).click();
+  await expect(page.getByRole('alert')).toContainText('otra ventana');
+  await expect(page.getByLabel('Título', { exact: true })).toHaveValue('Mi borrador');
+  expect(await snapshot(page)).toEqual(before);
+  page.once('dialog', (d) => d.dismiss());
+  await page.getByRole('button', { name: 'Cancelar tarea' }).click();
+  await expect(page.getByLabel('Título', { exact: true })).toHaveValue('Mi borrador');
+  page.once('dialog', (d) => d.accept());
+  await page.getByRole('button', { name: 'Cancelar tarea' }).click();
+  await page.getByRole('button', { name: 'Editar tarea Tarea de prueba' }).click();
+  await expect(page.getByLabel('Descripción (opcional)')).toHaveValue(
+    'Guardado desde otra ventana',
+  );
+  await page.getByLabel('Título', { exact: true }).fill('Mi borrador');
+  await page.getByRole('button', { name: 'Guardar tarea' }).click();
+  await expect(page.getByRole('button', { name: 'Editar tarea Mi borrador' })).toBeVisible();
+  await second.close();
+});
+test('CN007 sin contexto, fecha inválida y lectura recuperable', async ({ page }) => {
+  await page.goto('/#/tareas');
+  await expect(
+    page.getByText('Configura tu grupo en Configuración para gestionar tareas.'),
+  ).toBeVisible();
+  await configure(page);
+  await navigate(page, 'Tareas');
+  await page.getByRole('button', { name: 'Crear tarea', exact: true }).click();
+  await page.getByLabel('Título', { exact: true }).fill('Fecha');
+  await page.getByLabel('Fecha de asignación').fill('2026-07-31');
+  await page.getByRole('button', { name: 'Guardar tarea' }).click();
+  await expect(page.getByRole('form')).toHaveCount(1);
+  expect(await page.evaluate(() => window.classNoteAudit.db.assignments.count())).toBe(0);
+  await page.getByLabel('Fecha de asignación').fill('2026-08-01');
+  await page.getByRole('button', { name: 'Guardar tarea' }).click();
+  await expect(page.getByRole('form')).toHaveCount(0);
+  await navigate(page, 'Inicio');
+  await expect(page.getByRole('link', { name: 'Alumnos del grupo', exact: true })).toBeVisible();
+  await page.evaluate(() => {
+    const get = IDBIndex.prototype.getAll;
+    IDBIndex.prototype.getAll = function (...args) {
+      if (this.objectStore.name === 'assignments') {
+        IDBIndex.prototype.getAll = get;
+        throw new DOMException('Sintético', 'UnknownError');
+      }
+      return get.apply(this, args);
+    };
+  });
+  await navigate(page, 'Tareas');
+  await expect(page.getByRole('alert')).toBeVisible();
+  await page.getByRole('button', { name: 'Reintentar listado' }).click();
+  await expect(page.getByRole('button', { name: 'Editar tarea Fecha' })).toBeVisible();
+});
+test('CN007 búsquedas y fechas conservan selección explícita y conteos', async ({ page }) => {
+  await configure(page, 1);
+  await createTask(page, 'Una');
+  await createTask(page, 'Otra');
+  await page.getByText('Buscar y filtrar', { exact: true }).click();
+  await page.getByLabel('Buscar tareas por título').fill('UNA');
+  await expect(page.locator('.assignment-list-row')).toHaveCount(1);
+  await page.getByLabel('Asignación desde').fill('2026-10-20');
+  await expect(page.getByText('Sin coincidencias de tareas.')).toBeVisible();
+  await page.getByLabel('Asignación desde').fill('2026-10-19');
+  await page.getByRole('button', { name: 'Ver entregas de Una' }).click();
+  await expect(page.getByRole('definition')).toHaveText(['1', '0', '0', '0', '1', '1']);
+});
+test('CN007 edición conserva entregas y bloquea fecha incompatible e incidencias antiguas', async ({
   page,
 }) => {
-  await setup(page);
-  await prepareAssignments(page);
-  await commentField(page, 0).fill('Se conserva');
+  await configure(page, 1);
+  await createTask(page);
+  await page.evaluate(async () => {
+    const { r, db } = window.classNoteAudit;
+    const a = (await db.assignments.toArray())[0]!;
+    const g = (await db.groups.toArray())[0]!;
+    const e = (await db.enrollments.toArray())[0]!;
+    const c = { schoolYearId: g.schoolYearId, groupId: g.id, enrollmentId: e.id };
+    await r.createSubmission(c, { assignmentId: a.id, status: 'submitted', comment: 'Conservar' });
+    await r.updateEnrollment(c, { status: 'inactive', leftAt: '2026-10-19' });
+  });
+  await page.getByRole('button', { name: 'Editar tarea Tarea de prueba' }).click();
+  await page.getByLabel('Fecha de asignación').fill('2026-10-20');
+  const before = await snapshot(page);
+  await page.getByRole('button', { name: 'Guardar tarea' }).click();
+  await expect(page.getByRole('alert')).toContainText('población');
+  expect(await snapshot(page)).toEqual(before);
+  await page.getByLabel('Fecha de asignación').fill('2026-10-19');
+  await page.getByLabel('Título', { exact: true }).fill('Corregida');
+  await page.getByRole('button', { name: 'Guardar tarea' }).click();
+  await page.getByRole('button', { name: 'Ver entregas de Corregida' }).click();
+  await expect(page.getByLabel(/Comentario de/)).toHaveValue('Conservar');
+  await navigate(page, 'Inicio');
+  await page.evaluate(async () => {
+    const { db } = window.classNoteAudit;
+    const e = (await db.enrollments.toArray())[0]!;
+    await db.enrollments.update(e.id, { leftAt: '2026-10-18' });
+  });
+  await navigate(page, 'Tareas');
+  await page.getByRole('button', { name: 'Ver entregas de Corregida' }).click();
+  await expect(page.getByRole('region', { name: 'Incidencias de entregas' })).toContainText(
+    'Conservar',
+  );
+  await expect(page.getByRole('group', { name: /Estado de/ })).toHaveCount(0);
+  await attachAudit(page);
+});
+
+test('CN007 entrega guardada con consulta posterior fallida solo reintenta lectura', async ({
+  page,
+}) => {
+  await configure(page, 1);
+  await createTask(page);
+  await page.getByRole('button', { name: 'Ver entregas de Tarea de prueba' }).click();
+  await page.getByRole('button', { name: 'Entregada', exact: true }).click();
+  await page.getByLabel(/Comentario de/).fill('Comentario confirmado');
   await page.evaluate(() => {
     const add = IDBObjectStore.prototype.add;
-    let fail = true;
-    IDBObjectStore.prototype.add = function (...args: Parameters<IDBObjectStore['add']>) {
-      if (this.name === 'submissions' && fail) {
-        fail = false;
-        throw new DOMException('Fallo sintético', 'UnknownError');
+    IDBObjectStore.prototype.add = function (...args) {
+      if (this.name === 'submissions') {
+        IDBObjectStore.prototype.add = add;
+        this.transaction.addEventListener('complete', () => {
+          const get = IDBObjectStore.prototype.get;
+          IDBObjectStore.prototype.get = function (...args) {
+            if (this.name === 'assignments') {
+              IDBObjectStore.prototype.get = get;
+              throw new DOMException('Consulta posterior sintética', 'UnknownError');
+            }
+            return get.apply(this, args);
+          };
+        });
       }
       return add.apply(this, args);
     };
   });
-  await saveDeliveries(page).click();
-  await expect(page.getByRole('alert')).toContainText('No se pudo acceder');
-  await expect(commentField(page, 0)).toHaveValue('Se conserva');
-  await page.evaluate(() => {
-    const get = IDBObjectStore.prototype.get;
-    let fail = true;
-    IDBObjectStore.prototype.get = function (...args: Parameters<IDBObjectStore['get']>) {
-      if (this.name === 'groups' && this.transaction.mode === 'readonly' && fail) {
-        fail = false;
-        throw new DOMException('Fallo sintético', 'UnknownError');
-      }
-      return get.apply(this, args);
-    };
-  });
-  await saveDeliveries(page).focus();
-  await page.keyboard.press('Enter');
-  await expect(page.getByRole('alert')).toContainText('Las entregas se guardaron');
-  await expect(saveDeliveries(page)).toHaveCount(0);
-  await page.getByRole('button', { name: 'Reintentar lectura', exact: true }).click();
-  await expect(commentField(page, 0)).toHaveValue('Se conserva');
-  await expect(statusField(page, 0)).toHaveValue('pending');
-  await expect(saveDeliveries(page)).toBeDisabled();
-  await expect(page.getByText('Aún no tiene registro guardado', { exact: true })).toHaveCount(3);
-});
-
-test('CN007 conflictos entre ventanas conservan borrador y revisión explícita', async ({
-  page,
-  context,
-}) => {
-  await setup(page);
-  await prepareAssignments(page);
-  const second = await context.newPage();
-  await second.goto('/#/tareas');
-  await second.getByRole('button', { name: `Ver entregas de ${taskTitle}`, exact: true }).click();
-  await expect(statusField(second, 0)).toHaveValue('pending');
-  await statusField(page, 0).selectOption('submitted');
-  await saveDeliveries(page).click();
-  await expect(saveDeliveries(page)).toBeDisabled();
-  await statusField(second, 0).selectOption('incomplete');
-  await commentField(second, 0).fill('Conflicto ficticio');
-  await saveDeliveries(second).click();
-  await expect(second.getByRole('alert')).toContainText('otra ventana');
-  await expect(commentField(second, 0)).toHaveValue('Conflicto ficticio');
-  second.once('dialog', (dialog) => dialog.accept());
-  await second.getByRole('button', { name: 'Revisar entregas guardadas', exact: true }).click();
-  await expect(statusField(second, 0)).toHaveValue('submitted');
-  await expect(commentField(second, 0)).toHaveValue('');
-  await second.close();
-});
-
-test('CN007 sin contexto, fecha inicial fuera de ciclo y listado fallido recuperable sin repetir alta', async ({
-  page,
-}) => {
-  await page.clock.setFixedTime(new Date(2028, 0, 1, 12));
-  await page.goto('/#/tareas');
-  await expect(
-    page.getByText('Selecciona un ciclo y un grupo para gestionar tareas.', { exact: true }),
-  ).toBeVisible();
-  await createYearsAndGroups(page);
-  await openAssignments(page);
-  await page.getByRole('button', { name: 'Crear tarea', exact: true }).click();
-  await expect(page.getByLabel('Fecha de asignación', { exact: true })).toHaveValue('');
-  await page.getByRole('button', { name: 'Cancelar tarea', exact: true }).click();
-  await page.evaluate(() => {
-    const get = IDBObjectStore.prototype.get;
-    let fail = true;
-    IDBObjectStore.prototype.get = function (...args: Parameters<IDBObjectStore['get']>) {
-      if (this.name === 'groups' && this.transaction.mode === 'readonly' && fail) {
-        fail = false;
-        throw new DOMException('Fallo sintético', 'UnknownError');
-      }
-      return get.apply(this, args);
-    };
-  });
-  await createTask(page, 'Alta única sintética');
-  await expect(page.getByRole('alert')).toContainText('Reintenta solo la lectura');
-  await page.getByRole('button', { name: 'Reintentar listado', exact: true }).click();
-  await expect(
-    page.getByRole('button', { name: 'Ver entregas de Alta única sintética', exact: true }),
-  ).toHaveCount(1);
-});
-
-test('CN007 cambios rápidos de grupo no publican detalle ni conteos anteriores', async ({
-  page,
-}) => {
-  await setup(page);
-  await prepareAssignments(page);
-  for (const label of ['1.º B', '1.º A', '1.º B'])
-    await page.getByLabel('Grupo de trabajo', { exact: true }).selectOption({ label });
-  await expect(page.getByText('Este grupo aún no tiene tareas.', { exact: true })).toBeVisible();
-  await expect(page.getByRole('definition')).toHaveCount(0);
-  await expect(page.getByRole('region', { name: 'Entregas de la tarea' })).toHaveCount(0);
-});
-
-test('CN007 editar tarea conserva entregas; fecha incompatible rechazada e incidencia visible sin edición', async ({
-  page,
-}) => {
-  await setup(page);
-  await prepareAssignments(page);
-  await commentField(page, 0).fill('Comentario histórico');
-  await statusField(page, 0).selectOption('submitted');
-  await saveDeliveries(page).click();
-  await expect(saveDeliveries(page)).toBeDisabled();
-  await expect(page.getByRole('region', { name: 'Entregas de la tarea' })).toHaveAttribute(
-    'aria-busy',
-    'false',
-  );
-  await page.getByRole('button', { name: `Editar tarea ${taskTitle}`, exact: true }).click();
-  await page.getByLabel('Descripción (opcional)', { exact: true }).fill('Descripción corregida');
-  await page.getByRole('button', { name: 'Guardar tarea', exact: true }).click();
-  await expect(page.getByRole('form')).toHaveCount(0);
-  await page.getByRole('button', { name: `Ver entregas de ${taskTitle}`, exact: true }).click();
-  await expect(commentField(page, 0)).toHaveValue('Comentario histórico');
-  // A synthetic historical correction simulates data changed after this task was assigned.
-  await page.evaluate(async () => {
-    await new Promise<void>((resolve, reject) => {
-      const request = indexedDB.open('classnote');
-      request.onsuccess = () => {
-        const db = request.result;
-        const tx = db.transaction(['students', 'enrollments'], 'readwrite');
-        const students = tx.objectStore('students').getAll();
-        students.onsuccess = () => {
-          const student = (students.result as { id: string; firstName: string }[]).find(
-            (s) => s.firstName === 'Ána editada',
-          );
-          const entries = tx.objectStore('enrollments').getAll();
-          entries.onsuccess = () => {
-            for (const row of entries.result as { studentId: string; joinedAt: string }[])
-              if (row.studentId === student?.id)
-                tx.objectStore('enrollments').put({ ...row, joinedAt: '2026-10-20' });
-          };
-        };
-        tx.oncomplete = () => {
-          db.close();
-          resolve();
-        };
-        tx.onerror = () => {
-          db.close();
-          reject(new Error('Fallo de fixture'));
-        };
-      };
-      request.onerror = () => reject(new Error('Fallo de fixture'));
-    });
-  });
-  await page.getByRole('button', { name: `Editar tarea ${taskTitle}`, exact: true }).click();
-  await page.getByLabel('Fecha de asignación', { exact: true }).fill('2026-10-18');
-  await page.getByRole('button', { name: 'Guardar tarea', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('dejaría entregas fuera de su población');
-  page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: 'Cancelar tarea', exact: true }).click();
-  await page.getByRole('button', { name: `Ver entregas de ${taskTitle}`, exact: true }).click();
-  const incidents = page.getByRole('region', { name: 'Incidencias de entregas' });
-  await expect(incidents).toContainText('Comentario histórico');
-  await expect(incidents).toContainText('Fuera del intervalo de matrícula');
-  await expect(statusField(page, 0)).toHaveCount(0);
-  await expect(incidents.getByRole('combobox')).toHaveCount(0);
-  await expect(page.getByRole('definition')).toHaveText(['3', '0', '0', '0', '3', '3']);
+  await page.getByRole('button', { name: /Guardar entregas/ }).click();
+  await expect(page.getByRole('alert')).toContainText('guardaron');
+  await expect(page.getByRole('button', { name: /Guardar entregas/ })).toHaveCount(0);
+  expect(await page.evaluate(() => window.classNoteAudit.db.submissions.count())).toBe(1);
+  await page.getByRole('button', { name: 'Reintentar lectura' }).click();
+  await expect(page.getByLabel(/Comentario de/)).toHaveValue('Comentario confirmado');
+  await expect(page.getByRole('button', { name: /Guardar entregas/ })).toBeDisabled();
 });

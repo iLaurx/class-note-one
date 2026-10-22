@@ -53,7 +53,8 @@ export function AssignmentForm({
             description: fields.description.trim() || undefined,
             dueDate: fields.dueDate || undefined,
           };
-          if (assignment) await repositories.updateAssignment(context, assignment.id, input);
+          if (assignment)
+            await repositories.updateAssignment(context, assignment.id, input, assignment);
           else await repositories.createAssignment(context, input);
           setSaved(true);
           onSaved();

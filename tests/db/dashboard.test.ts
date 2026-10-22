@@ -5,11 +5,11 @@ import { ClassNoteDatabase } from '../../src/db/database.ts';
 import { Repositories } from '../../src/db/repositories.ts';
 import { createFixture } from './fixtures.ts';
 import { dashboardPeriod, localDay } from '../../src/features/dashboard/dashboardDomain.ts';
-
 function setup() {
   const db = new ClassNoteDatabase(`cn010-${crypto.randomUUID()}`);
   return { db, r: new Repositories(db) };
 }
+
 test('CN010 calendario local, límites de año/mes y bisiesto sin UTC', () => {
   assert.equal(localDay(new Date(2026, 9, 19, 23, 59)), '2026-10-19');
   assert.deepEqual(dashboardPeriod('2027-01-01'), {
@@ -22,6 +22,7 @@ test('CN010 calendario local, límites de año/mes y bisiesto sin UTC', () => {
   });
   assert.throws(() => dashboardPeriod('2026-02-29'));
 });
+
 test('CN010 población inclusiva histórica, asistencia parcial/justificada y pendientes por asignación', async (t) => {
   const { db, r } = setup();
   t.after(() => db.delete());
@@ -45,30 +46,33 @@ test('CN010 población inclusiva histórica, asistencia parcial/justificada y pe
     status: 'inactive',
   });
   const summary = await r.loadDashboard(f.context, '2026-10-19');
-  assert.equal(summary.students, 2);
+  assert.equal(summary.students, 3);
   assert.deepEqual(summary.attendance, {
     present: 0,
     absent: 0,
     late: 0,
     excused: 1,
-    unregistered: 1,
-    total: 2,
+    unregistered: 2,
+    total: 3,
   });
-  assert.equal(summary.assignments[0]!.population, 2);
-  assert.equal(summary.assignments[0]!.pending, 2);
+  assert.equal(summary.assignments[0]!.population, 3);
+  assert.equal(summary.assignments[0]!.pending, 3);
   await r.createSubmission(f.enrollmentContext, {
     assignmentId: f.assignment.id,
     status: 'incomplete',
   });
-  assert.equal((await r.loadDashboard(f.context, '2026-10-20')).assignments[0]!.pending, 1);
+  assert.equal((await r.loadDashboard(f.context, '2026-10-20')).assignments[0]!.pending, 2);
   assert.equal((await r.loadDashboard(f.context, '2026-10-20')).students, 2);
 });
+
 test('CN010 aislamiento ciclos/grupos, semana completa, ceros, agenda acotada y lectura sin escrituras', async (t) => {
   const { db, r } = setup();
   t.after(() => db.delete());
   const f = await createFixture(r);
   const other = await createFixture(r, 'Otro ciclo sintético');
-  const group = await r.createGroup({ schoolYearId: f.year.id, grade: 2, name: 'Otro' });
+  // A historical group may coexist with the single active group.
+  const group = { ...f.group, id: crypto.randomUUID(), grade: 2, name: 'Otro', archived: true };
+  await db.groups.add(group);
   for (const [date, minutes] of [
     ['2026-10-18', 100],
     ['2026-10-19', 0],

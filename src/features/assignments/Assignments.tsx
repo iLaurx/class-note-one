@@ -161,7 +161,10 @@ function AssignmentWorkspace({
           context={context}
           year={year}
           assignment={view.assignment}
-          onCancel={() => setView({ type: 'list' })}
+          onCancel={() => {
+            setView({ type: 'list' });
+            void load();
+          }}
           onSaved={() => {
             setSaved(true);
             setView({ type: 'list' });

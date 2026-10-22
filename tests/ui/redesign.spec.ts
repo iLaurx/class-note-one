@@ -49,13 +49,20 @@ for (const width of [1280, 768, 360]) {
     if (width > 760) {
       const cardsBox = await directory.boundingBox();
       const formBox = await registration.boundingBox();
-      expect(formBox!.x).toBeGreaterThan(cardsBox!.x + cardsBox!.width);
+      if (width >= 1000) expect(formBox!.x).toBeGreaterThan(cardsBox!.x + cardsBox!.width);
+      else expect(formBox!.y).toBeGreaterThanOrEqual(cardsBox!.y + cardsBox!.height);
       const lastStudent = await directory.locator('.student-card').last().boundingBox();
       expect(lastStudent!.y + lastStudent!.height).toBeLessThan(760);
     }
     if (width >= 1000) {
       const header = await page.locator('.sidebar').boundingBox();
-      expect(header!.height).toBeLessThanOrEqual(72);
+      expect(header!.height).toBe(960);
+      expect(header!.width).toBeLessThan(260);
+      expect(
+        await page
+          .locator('.sidebar')
+          .evaluate((element) => element.scrollHeight <= element.clientHeight),
+      ).toBe(true);
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
@@ -139,9 +146,9 @@ for (const width of [1280, 768, 360]) {
     }
     const tuesday = page.getByRole('region', { name: 'martes', exact: true });
     const monday = page.getByRole('region', { name: 'lunes', exact: true });
-    await expect(tuesday.locator('.assignment-card')).toHaveCount(2);
+    await expect(tuesday.locator('.assignment-list-row')).toHaveCount(2);
     await expect(tuesday).toContainText('20 de octubre de 2026');
-    await expect(monday.locator('.assignment-card')).toHaveCount(1);
+    await expect(monday.locator('.assignment-list-row')).toHaveCount(1);
     await expect(page.locator('.assignment-day').first()).toContainText('martes');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,

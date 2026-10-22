@@ -48,7 +48,9 @@ test('CN004 fechas, grados y duplicados de creación/edición sin escrituras par
   const first = await r.createSchoolYear(input);
   const second = await r.createSchoolYear({ ...input, label: 'Segundo' });
   const a = await r.createGroup({ schoolYearId: first.id, grade: 1, name: 'A' });
-  const b = await r.createGroup({ schoolYearId: first.id, grade: 1, name: 'B' });
+  const b = { ...a, id: crypto.randomUUID(), name: 'B', archived: false };
+  // Legacy multi-group history retains duplicate-edit coverage.
+  await db.groups.add(b);
   const before = await Promise.all(db.tables.map((table) => table.toArray()));
   for (const fields of [{ startDate: '2026-02-30' }, { startDate: '2028-01-01' }, { label: ' ' }]) {
     await assert.rejects(r.updateSchoolYear(first.id, { ...input, ...fields }));
@@ -73,10 +75,9 @@ test('CN004 reducción de intervalo valida matrículas y asistencias, conserva r
   const { db, r } = setup();
   t.after(() => db.delete());
   const f = await fillRelated(r);
-  await assert.rejects(
-    r.updateSchoolYear(f.year.id, { ...f.year, startDate: '2026-08-02' }),
-    /matrículas/,
-  );
+  const changed = await r.updateSchoolYear(f.year.id, { ...f.year, startDate: '2026-08-02' });
+  assert.equal(changed.startDate, '2026-08-02');
+  const restored = await r.updateSchoolYear(f.year.id, f.year);
   // Attendance after a proposed end is rejected independently of open-ended enrollment.
   await assert.rejects(
     r.updateSchoolYear(f.year.id, { ...f.year, endDate: '2026-10-18' }),
@@ -87,7 +88,7 @@ test('CN004 reducción de intervalo valida matrículas y asistencias, conserva r
     r.updateSchoolYear(f.year.id, { ...f.year, endDate: '2027-07-30' }),
     /matrículas/,
   );
-  assert.deepEqual((await r.listSchoolYears())[0], f.year);
+  assert.deepEqual((await r.listSchoolYears())[0], restored);
   await r.updateSchoolYear(f.year.id, {
     ...f.year,
     startDate: '2025-01-01',
@@ -100,7 +101,8 @@ test('CN004 archivo atómico de contexto, sin cascada y reactivación conserva h
   const { db, r } = setup();
   t.after(() => db.delete());
   const f = await fillRelated(r);
-  const other = await r.createGroup({ schoolYearId: f.year.id, grade: 2, name: 'B' });
+  const other = { ...f.group, id: crypto.randomUUID(), grade: 2, name: 'B' };
+  await db.groups.add(other);
   const history = await Promise.all(
     db.tables
       .filter((table) => !['schoolYears', 'groups', 'appSettings'].includes(table.name))
@@ -108,7 +110,10 @@ test('CN004 archivo atómico de contexto, sin cascada y reactivación conserva h
   );
   await r.selectContext(f.context);
   await r.archiveGroup(f.context);
-  assert.deepEqual((await r.loadWorkspace()).selection, { schoolYearId: f.year.id, groupId: null });
+  assert.deepEqual((await r.loadWorkspace()).selection, {
+    schoolYearId: f.year.id,
+    groupId: other.id,
+  });
   await assert.rejects(r.updateGroup(f.context, f.group));
   await r.selectContext({ schoolYearId: f.year.id, groupId: other.id });
   await r.archiveSchoolYear(f.year.id);
@@ -122,6 +127,8 @@ test('CN004 archivo atómico de contexto, sin cascada y reactivación conserva h
   await assert.rejects(r.selectContext(f.context));
   await r.reactivateSchoolYear(f.year.id);
   assert.equal((await db.groups.get(f.group.id))?.archived, true);
+  await assert.rejects(r.reactivateGroup(f.context), /grupo activo/);
+  await r.archiveGroup({ ...f.context, groupId: other.id });
   await r.reactivateGroup(f.context);
   assert.equal((await db.groups.get(f.group.id))?.archived, false);
   assert.deepEqual(
@@ -134,13 +141,13 @@ test('CN004 archivo atómico de contexto, sin cascada y reactivación conserva h
   );
 });
 
-test('CN004 selección recuperada, referencias inválidas descartadas sin elegir reemplazo', async (t) => {
+test('CN004 selección recuperada, referencias inválidas recuperan el ciclo y grupo activos', async (t) => {
   const { db, r } = setup();
   t.after(() => db.delete());
   assert.deepEqual((await r.loadWorkspace()).selection, { schoolYearId: null, groupId: null });
-  assert.equal(await db.appSettings.count(), 0);
+  assert.equal(await db.appSettings.count(), 2);
   const f = await fillRelated(r);
-  const y2 = await r.createSchoolYear({ ...input, label: 'Otro' });
+  const y2 = await r.createSchoolYear({ ...input, label: 'Otro', startDate: '2026-09-01' });
   await r.selectContext(f.context);
   db.close();
   await db.open();
@@ -149,7 +156,7 @@ test('CN004 selección recuperada, referencias inválidas descartadas sin elegir
   assert.deepEqual((await r.loadWorkspace()).selection, f.context);
   for (const value of [crypto.randomUUID(), 1, 'malformado']) {
     await db.appSettings.put({ key: 'work.schoolYearId', value });
-    assert.deepEqual((await r.loadWorkspace()).selection, { schoolYearId: null, groupId: null });
+    assert.deepEqual((await r.loadWorkspace()).selection, { schoolYearId: y2.id, groupId: null });
   }
   for (const value of [crypto.randomUUID(), false, 'malformado']) {
     await r.selectContext({ schoolYearId: y2.id, groupId: null });
@@ -163,7 +170,7 @@ test('CN004 selección recuperada, referencias inválidas descartadas sin elegir
   assert.deepEqual((await r.loadWorkspace()).selection, { schoolYearId: y2.id, groupId: null });
   await r.selectContext(f.context);
   await db.schoolYears.update(f.year.id, { archived: true });
-  assert.deepEqual((await r.loadWorkspace()).selection, { schoolYearId: null, groupId: null });
+  assert.deepEqual((await r.loadWorkspace()).selection, { schoolYearId: y2.id, groupId: null });
   await db.schoolYears.update(f.year.id, { archived: false });
   await r.selectContext(f.context);
   await db.groups.update(f.group.id, { archived: true });

@@ -1,3 +1,4 @@
+use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
 // Initialize only the Rust dialog state. The upstream JS initializer replaces
@@ -38,10 +39,26 @@ async fn save_group_report(app: tauri::AppHandle, bytes: Vec<u8>) -> Result<bool
     }).await.map_err(|_| "No se pudo completar la exportación.".to_string())?
 }
 
+// Close is checked in JavaScript by the same draft guard used by navigation.
+#[tauri::command]
+fn close_main_window(app: tauri::AppHandle) -> Result<(), String> {
+    app.get_webview_window("main")
+        .ok_or("No se encontró la ventana.")?
+        .destroy().map_err(|_| "No se pudo cerrar la aplicación.".to_string())
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(NativeFileDialogs(tauri_plugin_dialog::init()))
-        .invoke_handler(tauri::generate_handler![save_group_report, save_backup, open_backup])
+        .invoke_handler(tauri::generate_handler![save_group_report, save_backup, open_backup, close_main_window])
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                if let Some(webview) = window.app_handle().get_webview_window(window.label()) {
+                    let _ = webview.eval("window.dispatchEvent(new Event('classnote-close-requested'))");
+                }
+            }
+        })
         .run(tauri::generate_context!())
         .expect("No se pudo iniciar ClassNote");
 }

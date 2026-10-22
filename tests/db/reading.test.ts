@@ -65,7 +65,7 @@ test('CN008 entradas inválidas se rechazan sin escribir: minutos, título, cale
     leftAt: '2026-10-31',
     status: 'inactive',
   });
-  for (const date of ['2026-09-30', '2026-11-01'])
+  for (const date of ['2026-07-31', '2026-11-01'])
     await assert.rejects(r.createReadingLog(f.enrollmentContext, { ...input, date }));
   assert.equal(await db.readingLogs.count(), 0);
 });
@@ -77,9 +77,16 @@ test('CN008 extremos inclusivos, historia inactiva/archivada sin inferir salida 
   for (const date of [f.year.startDate, f.year.endDate])
     await r.createReadingLog(f.enrollmentContext, { ...input, date });
   assert.equal((await r.listEnrollments(f.context))[0]!.leftAt, undefined);
+  await assert.rejects(
+    r.updateEnrollment(f.enrollmentContext, {
+      leftAt: '2026-10-31',
+      status: 'inactive',
+    }),
+    /lecturas/,
+  );
   await r.updateEnrollment(f.enrollmentContext, {
     joinedAt: '2026-10-01',
-    leftAt: '2026-10-31',
+    leftAt: f.year.endDate,
     status: 'inactive',
   });
   for (const date of ['2026-10-01', '2026-10-31'])

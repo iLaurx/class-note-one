@@ -1,4 +1,5 @@
 import { ArrowUpRight, UserRoundPlus, UsersRound } from 'lucide-react';
+import { allowNavigation } from '../../app/pendingChanges';
 import { StudentForm } from './StudentForm';
 import type { StudentFormState } from './studentFormState';
 import { fullName, matches } from './studentPresentation';
@@ -50,6 +51,7 @@ function StudentGroup({ year, group }: { year: SchoolYear; group: Group }) {
   const student = state.records?.students.find((s) => s.id === detail);
   const history = state.records?.enrollments.filter((e) => e.studentId === detail) ?? [];
   async function open(next: StudentFormState) {
+    if (!allowNavigation()) return;
     if (next.kind === 'archive' && !(await state.openRecords())) return;
     setForm(next);
   }
@@ -146,7 +148,7 @@ function StudentGroup({ year, group }: { year: SchoolYear; group: Group }) {
             </h3>
             <button
               disabled={state.busy || !!form}
-              onClick={() => setForm({ kind: 'edit', student })}
+              onClick={() => void open({ kind: 'edit', student })}
             >
               Editar ficha
             </button>
@@ -185,7 +187,7 @@ function StudentGroup({ year, group }: { year: SchoolYear; group: Group }) {
                       <div>
                         <button
                           disabled={state.busy || !!form}
-                          onClick={() => setForm({ kind: 'dates', enrollment: e })}
+                          onClick={() => void open({ kind: 'dates', enrollment: e })}
                         >
                           Corregir fechas
                         </button>
@@ -194,7 +196,7 @@ function StudentGroup({ year, group }: { year: SchoolYear; group: Group }) {
                             state.busy || !!form || (!student.active && e.status === 'inactive')
                           }
                           onClick={() =>
-                            setForm({
+                            void open({
                               kind: e.status === 'active' ? 'leave' : 'reactivate',
                               enrollment: e,
                             })

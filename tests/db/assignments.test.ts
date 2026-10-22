@@ -10,7 +10,6 @@ import {
   submissionCounts,
 } from '../../src/features/assignments/assignmentDomain.ts';
 const date = '2026-10-19';
-
 test('eliminar tarea borra sus entregas y comentarios y conserva los demás datos', async (t) => {
   const { db, r } = setup();
   t.after(() => db.delete());
@@ -39,7 +38,12 @@ test('eliminar tarea requiere confirmación, contexto correcto y datos vigentes'
   const other = await createFixture(r, 'Otro');
   await assert.rejects(r.deleteAssignment(f.context, f.assignment.id, f.assignment, false));
   await assert.rejects(r.deleteAssignment(other.context, f.assignment.id, f.assignment, true));
-  await r.updateAssignment(f.context, f.assignment.id, { ...f.assignment, title: 'Corregida' });
+  await r.updateAssignment(
+    f.context,
+    f.assignment.id,
+    { ...f.assignment, title: 'Corregida' },
+    f.assignment,
+  );
   await assert.rejects(
     r.deleteAssignment(f.context, f.assignment.id, f.assignment, true),
     /otra ventana/,
@@ -89,20 +93,25 @@ test('CN007 alta/edición recortadas, homónimas, identidad inmutable y sin camb
   assert.equal(second.title, f.assignment.title);
   assert.equal(second.description, 'Texto');
   assert.equal((await r.listAssignments(f.context)).length, 2);
-  assert.deepEqual(await r.updateAssignment(f.context, second.id, second), second);
-  const changed = await r.updateAssignment(f.context, second.id, {
-    ...second,
-    title: 'Editada',
-    description: undefined,
-    dueDate: undefined,
-  });
+  assert.deepEqual(await r.updateAssignment(f.context, second.id, second, second), second);
+  const changed = await r.updateAssignment(
+    f.context,
+    second.id,
+    {
+      ...second,
+      title: 'Editada',
+      description: undefined,
+      dueDate: undefined,
+    },
+    second,
+  );
   assert.equal(changed.id, second.id);
   assert.equal(changed.createdAt, second.createdAt);
   assert.equal(changed.groupId, second.groupId);
   assert.equal(changed.description, undefined);
   assert.ok(changed.updatedAt >= second.updatedAt);
   await assert.rejects(
-    r.updateAssignment(f.context, second.id, { ...second, groupId: crypto.randomUUID() }),
+    r.updateAssignment(f.context, second.id, { ...second, groupId: crypto.randomUUID() }, second),
   );
 });
 
@@ -121,12 +130,14 @@ test('CN007 fechas reales, orden, ciclo, títulos y contextos activos; sin escri
   ]) {
     const fields = { ...f.assignment, ...data };
     await assert.rejects(r.createAssignment(f.context, fields));
-    await assert.rejects(r.updateAssignment(f.context, f.assignment.id, fields));
+    await assert.rejects(r.updateAssignment(f.context, f.assignment.id, fields, f.assignment));
   }
-  await assert.rejects(r.updateAssignment(other.context, f.assignment.id, f.assignment));
+  await assert.rejects(
+    r.updateAssignment(other.context, f.assignment.id, f.assignment, f.assignment),
+  );
   await r.archiveGroup(f.context);
   await assert.rejects(r.createAssignment(f.context, f.assignment));
-  await assert.rejects(r.updateAssignment(f.context, f.assignment.id, f.assignment));
+  await assert.rejects(r.updateAssignment(f.context, f.assignment.id, f.assignment, f.assignment));
   await assert.rejects(r.saveSubmissions(f.context, f.assignment.id, [input(f.enrollment.id)]));
   await r.reactivateGroup(f.context);
   await r.archiveSchoolYear(f.year.id);
@@ -157,20 +168,25 @@ test('CN007 población inclusiva, fichas archivadas/históricas, sin instantáne
   });
   await r.setStudentActive(f.student.id, false);
   const detail = await r.loadAssignment(f.context, f.assignment.id);
-  assert.equal(detail.rows.length, 2);
+  assert.equal(detail.rows.length, 3);
   assert.equal(detail.rows.find((row) => row.student.id === f.student.id)?.student.active, false);
   assert.ok(detail.rows.some((row) => row.enrollment.id === boundary.enrollment.id));
-  assert.ok(!detail.rows.some((row) => row.enrollment.id === later.enrollment.id));
+  assert.ok(detail.rows.some((row) => row.enrollment.id === later.enrollment.id));
   assert.ok(detail.rows.every((row) => row.submission === null));
   assert.equal(await db.submissions.count(), 0);
   await r.saveSubmissions(f.context, f.assignment.id, [input(f.enrollment.id, 'submitted')]);
-  await r.updateEnrollment(f.enrollmentContext, {
-    ...f.enrollment,
-    status: 'inactive',
-    leftAt: '2026-10-18',
-  });
+  await assert.rejects(
+    r.updateEnrollment(f.enrollmentContext, {
+      ...f.enrollment,
+      status: 'inactive',
+      leftAt: '2026-10-18',
+    }),
+    /entregas/,
+  );
+  // Inject only to exercise recovery of old inconsistent databases.
+  await db.enrollments.update(f.enrollment.id, { leftAt: '2026-10-18' });
   const corrected = await r.loadAssignment(f.context, f.assignment.id);
-  assert.equal(corrected.rows.length, 1);
+  assert.equal(corrected.rows.length, 2);
   assert.equal(corrected.incidents.length, 1);
   assert.equal(corrected.incidents[0]?.submission.status, 'submitted');
   await assert.rejects(
@@ -336,15 +352,25 @@ test('CN007 cambiar asignación incompatible se rechaza sin pérdida; tarea conc
   const { db, r } = setup();
   t.after(() => db.delete());
   const f = await createFixture(r);
-  await r.updateEnrollment(f.enrollmentContext, { ...f.enrollment, joinedAt: date });
+  await r.updateEnrollment(f.enrollmentContext, { ...f.enrollment, leftAt: date });
   await r.saveSubmissions(f.context, f.assignment.id, [input(f.enrollment.id)]);
   await assert.rejects(
-    r.updateAssignment(f.context, f.assignment.id, { ...f.assignment, assignedDate: '2026-10-18' }),
+    r.updateAssignment(
+      f.context,
+      f.assignment.id,
+      { ...f.assignment, assignedDate: '2026-10-20' },
+      f.assignment,
+    ),
     /población/,
   );
   assert.deepEqual(await db.assignments.get(f.assignment.id), f.assignment);
   assert.equal(await db.submissions.count(), 1);
-  await r.updateAssignment(f.context, f.assignment.id, { ...f.assignment, title: 'Cambió' });
+  await r.updateAssignment(
+    f.context,
+    f.assignment.id,
+    { ...f.assignment, title: 'Cambió' },
+    f.assignment,
+  );
   await assert.rejects(
     r.saveSubmissions(
       f.context,

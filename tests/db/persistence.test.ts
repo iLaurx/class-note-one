@@ -61,7 +61,11 @@ test('índices únicos rechazan ciclos, grupos, matrícula, asistencia y entrega
   t.after(() => db.delete());
   const f = await createFixture(r);
   await assert.rejects(r.createSchoolYear({ ...f.year }), StorageError);
-  await assert.rejects(r.createGroup({ ...f.group, shift: 'Otro turno' }), StorageError);
+  await assert.rejects(r.createGroup({ ...f.group, shift: 'Otro turno' }), /grupo activo/);
+  // The application rule fails first; also keep the underlying unique-index assertion.
+  await assert.rejects(db.groups.add({ ...f.group, id: crypto.randomUUID() }), {
+    name: 'ConstraintError',
+  });
   await assert.rejects(r.createEnrollment(f.context, f.enrollment), StorageError);
   const attendance = { date: '2026-10-19', status: 'present' };
   await r.createAttendance(f.enrollmentContext, attendance);
@@ -243,9 +247,9 @@ test('asistencia respeta ciclo y matrícula con extremos inclusivos', async (t) 
     status: 'inactive',
   });
   const context = { ...f.context, enrollmentId: enrollment.id };
-  for (const date of ['2026-09-01', '2026-10-19'])
+  for (const date of ['2026-08-01', '2026-08-31', '2026-09-01', '2026-10-19'])
     await r.createAttendance(context, { date, status: 'present' });
-  for (const date of ['2026-08-31', '2026-10-20', '2027-08-01', '2026-07-31'])
+  for (const date of ['2026-10-20', '2027-08-01', '2026-07-31'])
     await assert.rejects(r.createAttendance(context, { date, status: 'present' }), ValidationError);
   for (const date of ['2026-08-01', '2027-07-31'])
     await r.createAttendance(f.enrollmentContext, { date, status: 'present' });

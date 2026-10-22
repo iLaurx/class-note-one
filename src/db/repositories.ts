@@ -284,6 +284,26 @@ export class Repositories {
         attendance.every((item) => item.date >= startDate && (!endDate || item.date <= endDate)),
         'El intervalo dejaría asistencias fuera del ciclo. Conserva sus fechas.',
       );
+      const inCycle = (date: string) => date >= startDate && (!endDate || date <= endDate);
+      const assignments = await this.db.assignments.where('groupId').anyOf(groups).toArray();
+      requireRule(
+        assignments.every(
+          (item) =>
+            inCycle(item.assignedDate) && (item.dueDate === undefined || inCycle(item.dueDate)),
+        ),
+        'El intervalo dejaría tareas o fechas de entrega fuera del ciclo. Conserva sus fechas.',
+      );
+      const enrollmentIds = enrollments.map((item) => item.id);
+      for (const [table, label] of [
+        [this.db.readingLogs, 'lecturas'],
+        [this.db.studentNotes, 'observaciones'],
+      ] as const) {
+        const rows = await table.where('enrollmentId').anyOf(enrollmentIds).toArray();
+        requireRule(
+          rows.every((item) => inCycle(item.date)),
+          `El intervalo dejaría ${label} fuera del ciclo. Conserva sus fechas.`,
+        );
+      }
       const fields = { label: text(data.label, 'Nombre del ciclo'), startDate, endDate };
       if (
         previous.label === fields.label &&
@@ -568,6 +588,27 @@ export class Repositories {
         attendance.every((item) => leftAt === undefined || item.date <= leftAt),
         'El intervalo dejaría asistencias fuera de la matrícula. Conserva sus fechas.',
       );
+      for (const [table, label] of [
+        [this.db.readingLogs, 'lecturas'],
+        [this.db.studentNotes, 'observaciones'],
+      ] as const) {
+        const rows = await table.where('enrollmentId').equals(enrollment.id).toArray();
+        requireRule(
+          rows.every((item) => leftAt === undefined || item.date <= leftAt),
+          `El intervalo dejaría ${label} fuera de la matrícula. Conserva sus fechas.`,
+        );
+      }
+      const submissions = await this.db.submissions
+        .where('enrollmentId')
+        .equals(enrollment.id)
+        .toArray();
+      for (const submission of submissions) {
+        const assignment = await this.db.assignments.get(submission.assignmentId);
+        requireRule(
+          assignment && (leftAt === undefined || assignment.assignedDate <= leftAt),
+          'El intervalo dejaría entregas fuera de la matrícula. Conserva sus fechas.',
+        );
+      }
       const value = {
         ...enrollment,
         leftAt,
@@ -754,7 +795,7 @@ export class Repositories {
     });
   }
 
-  updateAssignment(context: GroupContext, assignmentId: string, input: unknown) {
+  updateAssignment(context: GroupContext, assignmentId: string, input: unknown, expected: unknown) {
     return this.write(async () => {
       const { year, group } = await this.group(context);
       requireRule(
@@ -766,6 +807,11 @@ export class Repositories {
       requireRule(
         data.groupId === undefined || data.groupId === previous.groupId,
         'La tarea no se puede trasladar a otro grupo.',
+      );
+      const snapshot = record(expected);
+      requireRule(
+        Object.entries(previous).every(([key, value]) => snapshot[key] === value),
+        'La tarea cambió en otra ventana. Tu borrador se conserva. Cancela para volver al listado, actualízalo y abre la tarea de nuevo antes de aplicar tus cambios.',
       );
       const fields = assignmentFields(input, year);
       if (fields.assignedDate !== previous.assignedDate) {

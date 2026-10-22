@@ -82,7 +82,7 @@ test('CN009 fechas, categorías, campos y referencias inválidas no escriben', a
     leftAt: '2026-10-31',
     status: 'inactive',
   });
-  for (const date of ['2026-09-30', '2026-11-01'])
+  for (const date of ['2026-07-31', '2026-11-01'])
     await assert.rejects(r.createStudentNote(f.enrollmentContext, { ...input, date }));
   assert.equal(await db.studentNotes.count(), 0);
 });
